@@ -78,6 +78,8 @@ export interface OgkBridge {
   controllerReleaseAll(): Promise<ControllerCommandResult>;
   controllerVirtualKey(key: string, pressed: boolean): Promise<ControllerCommandResult>;
   controllerSetMode(keyboardMouse: boolean): Promise<ControllerCommandResult>;
+  controllerSetInputMode(modeId: string): Promise<ControllerCommandResult>;
+  controllerSelectBackend(backendId: string): Promise<ControllerCommandResult>;
   controllerSetBrightness(brightness: number): Promise<ControllerCommandResult>;
   controllerSetCustomColor(red: number, green: number, blue: number): Promise<ControllerCommandResult>;
   controllerSetPicoLighting(request: PicoLightingRequest): Promise<ControllerCommandResult>;

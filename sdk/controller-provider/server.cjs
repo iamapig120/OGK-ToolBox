@@ -2,7 +2,7 @@
 const http = require('node:http');
 const { randomUUID, timingSafeEqual } = require('node:crypto');
 
-const COMMANDS = new Set(['rescan', 'retry-sync', 'release-all', 'virtual-key', 'mode', 'brightness',
+const COMMANDS = new Set(['rescan', 'retry-sync', 'release-all', 'virtual-key', 'mode', 'input-mode', 'brightness',
   'custom-color', 'pico-lighting', 'hall', 'hall-calibration', 'hall-query', 'device-query',
   'lever', 'lever-calibration', 'bootloader']);
 
@@ -15,10 +15,43 @@ async function startProvider(adapter, argv = process.argv.slice(2)) {
     || typeof token !== 'string' || token.length < 32 || !instanceId || !version)
     throw new Error('Provider must be launched by OGKToolBox with valid session arguments.');
   const clients = new Set();
-  let sequence = 0, closing = false, queue = Promise.resolve();
+  let sequence = 0, closing = false, queue = Promise.resolve(), stopping, cancelRunning, activeOperation;
   const snapshot = () => ({ ...adapter.snapshot(), sequence: ++sequence, sampledAt: new Date().toISOString() });
-  const serialize = operation => { const next = queue.then(operation); queue = next.catch(() => {}); return next; };
-  const send = (res, code, data) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data)); };
+  const limited = async (task, milliseconds) => {
+    let timeout;
+    try {
+      return await Promise.race([task, new Promise((_, reject) => {
+        timeout = setTimeout(() => { const error = new Error('Adapter operation timed out'); error.code = 'ADAPTER_TIMEOUT'; reject(error); }, milliseconds);
+      })]);
+    } finally { clearTimeout(timeout); }
+  };
+  const serialize = operation => {
+    const next = queue.then(async () => {
+      if (closing) throw new Error('Provider is stopping');
+      let cancel;
+      const interrupted = new Promise((_, reject) => { cancel = reject; });
+      cancelRunning = cancel;
+      const operationTask = Promise.resolve().then(() => {
+        if (closing) throw new Error('Provider is stopping');
+        return operation();
+      });
+      activeOperation = operationTask;
+      const finished = () => { if (activeOperation === operationTask) activeOperation = undefined; };
+      operationTask.then(finished, finished);
+      try { return await limited(Promise.race([operationTask, interrupted]), 5000); }
+      catch (error) {
+        // A timeout cannot cancel arbitrary driver code. Stop the provider before another write can run.
+        if (error?.code === 'ADAPTER_TIMEOUT') void stop();
+        throw error;
+      } finally { if (cancelRunning === cancel) cancelRunning = undefined; }
+    });
+    queue = next.catch(() => {});
+    return next;
+  };
+  const send = (res, code, data) => {
+    if (res.destroyed || res.writableEnded) return;
+    res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data));
+  };
   const broadcast = () => {
     if (closing || !clients.size) return;
     const event = `data: ${JSON.stringify(snapshot())}\n\n`;
@@ -53,6 +86,8 @@ async function startProvider(adapter, argv = process.argv.slice(2)) {
       try { value = body ? JSON.parse(body) : {}; }
       catch { return send(res, 400, { error: 'Invalid JSON' }); }
       if (!value || typeof value !== 'object' || Array.isArray(value)) return send(res, 400, { error: 'Expected an object' });
+      if (command === 'input-mode' && (typeof value.modeId !== 'string' || !value.modeId || value.modeId.length > 80))
+        return send(res, 400, { error: 'Expected a modeId string' });
       if (command === 'shutdown') {
         send(res, 200, { commandId: randomUUID(), status: 'Accepted', message: 'Stopping', snapshot: snapshot() });
         void stop(); return;
@@ -64,22 +99,37 @@ async function startProvider(adapter, argv = process.argv.slice(2)) {
       broadcast();
     } catch {
       // Never echo arbitrary driver errors: they can contain device/card data or session arguments.
-      if (!res.headersSent) send(res, 500, { error: 'Controller adapter failed' });
+      if (!res.headersSent) send(res, closing ? 503 : 500, { error: closing ? 'Provider is stopping' : 'Controller adapter failed' });
       else res.destroy();
     }
   });
   server.requestTimeout = 5000;
   server.headersTimeout = 5000;
-  const stop = async () => {
-    if (closing) return;
+  const stop = () => {
+    if (stopping) return stopping;
     closing = true; clearInterval(timer); clearInterval(watchdog);
+    cancelRunning?.(new Error('Provider is stopping'));
     process.removeListener('SIGTERM', stop); process.removeListener('SIGINT', stop);
-    try { await serialize(() => adapter.releaseAll()); } catch { /* best effort on device loss */ }
-    try { await adapter.close?.(); } catch { /* still close the transport */ }
-    for (const client of clients) client.end();
-    server.close(); server.closeAllConnections();
+    stopping = (async () => {
+      // Cancellation ends our wait, not arbitrary driver code. Give in-flight work a bounded grace period.
+      await limited(Promise.allSettled([queue, activeOperation]), 250).catch(() => undefined);
+      // Some drivers need the open connection to release held keys. close() must then halt any remaining work.
+      await limited(Promise.resolve().then(() => adapter.releaseAll()), 250).catch(() => undefined);
+      await limited(Promise.resolve().then(() => adapter.close?.()), 250).catch(() => undefined);
+      for (const client of clients) client.end();
+      clients.clear();
+      await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
+    })();
+    return stopping;
   };
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
+  try {
+    await new Promise((resolve, reject) => {
+      const failed = error => reject(error);
+      server.once('error', failed);
+      server.listen(port, '127.0.0.1', () => { server.removeListener('error', failed); resolve(); });
+    });
+  } catch (error) { await stop(); throw error; }
+  server.on('error', () => { void stop(); });
   timer = setInterval(() => { try { broadcast(); } catch { void stop(); } }, 50);
   watchdog = setInterval(() => { try { process.kill(parentPid, 0); } catch { void stop(); } }, 1000);
   process.on('SIGTERM', stop); process.on('SIGINT', stop);

@@ -75,8 +75,8 @@ export const previewConfig: Config = {
   diagnostics: []
 };
 
-export function previewControllerSnapshot(): ControllerSnapshot {
-  const requested = new URLSearchParams(window.location.search).get("controllerState");
+export function previewControllerSnapshot(kindOverride?: string): ControllerSnapshot {
+  const requested = kindOverride ?? new URLSearchParams(window.location.search).get("controllerState");
   const requestedInputMode = new URLSearchParams(window.location.search).get("inputMode");
   const state = requested === "device-sync" ? "SyncingDevice" : requested === "syncing" ? "SyncingHall" : requested === "leonardo" ? "Ready"
     : requested === "unsupported" ? "Unsupported" : requested === "calibrating" ? "CalibratingHall"
@@ -87,7 +87,9 @@ export function previewControllerSnapshot(): ControllerSnapshot {
   // only Pico needs the separate Device Config page in the preview.
   const deviceConfigFresh = !offline && (!pico || state !== "SyncingDevice");
   const hallConfigFresh = pico && deviceConfigFresh && state !== "SyncingHall";
-  return {
+  const snapshot: ControllerSnapshot = {
+    source: { backendId: "preview-module", connectionId: `preview-${requested ?? "pico"}` },
+    inputModes: { current: "keyboard", options: [{ id: "mu3io", label: "MU3IO" }, { id: "keyboard", label: "模拟键鼠" }] },
     sequence: 42, sampledAt: new Date().toISOString(), state,
     error: state === "Unsupported" ? "检测到 protocol 2；当前版本仅支持 protocol 1。" : state === "Faulted" ? "ControllerHost 无法读取 HID 设备。" : null,
     identity: { kind: offline ? "Unknown" : pico ? "Pico" : "Leonardo", displayName: offline ? "未连接" : pico ? "NIA Controller Pro" : "Leonardo", vendorId: pico ? 0xCAFE : 0x2341, productId: pico ? 0x4000 : 0x8036, firmware: offline ? "—" : pico ? "1.4.2" : "legacy", hardwareVersion: offline ? 0 : 2, protocolVersion: pico ? 1 : 0 },
@@ -101,6 +103,18 @@ export function previewControllerSnapshot(): ControllerSnapshot {
     canWrite: !offline && (state === "Ready" || state === "CalibratingHall"), readbackComplete: deviceConfigFresh && (!pico || hallConfigFresh),
     deviceConfigRevision: deviceConfigFresh ? 1 : 0, hallConfigRevision: hallConfigFresh ? 1 : 0
   };
+  if (requested === "third-party") {
+    snapshot.source = { backendId: "preview-third-party", connectionId: "preview-third-party" };
+    snapshot.identity = { ...snapshot.identity, kind: "ExampleController", displayName: "示例控制器" };
+    snapshot.capabilities = { inputMonitor: true, virtualKeys: false, mode: true, basicLighting: false,
+      picoLighting: false, hallConfiguration: false, hallCalibration: false, leverConfiguration: false,
+      leverCalibration: false, cardReader: false, bootloader: false };
+    snapshot.inputModes = { current: "usb", options: [{ id: "usb", label: "USB 输入" }, { id: "keyboard", label: "键盘输入" }] };
+    snapshot.deviceConfig.isKmMode = false;
+    snapshot.card = { present: false, cardType: 0, type: "", identifier: "" };
+    snapshot.input.leftA = true;
+  }
+  return snapshot;
 }
 
 const previewSections: Record<LibrarySection, any[]> = {
@@ -113,8 +127,15 @@ const previewSections: Record<LibrarySection, any[]> = {
 
 export function installPreviewBridge(expressionError: boolean): void {
   if (!import.meta.env.DEV || window.ogk) return;
-  const controllerSnapshot = previewControllerSnapshot();
-  const controllerStatus: ControllerModuleStatus = { state: "ready" };
+  let controllerSnapshot = previewControllerSnapshot();
+  const controllerStatus: ControllerModuleStatus = { state: "ready",
+    selectedBackendId: controllerSnapshot.source?.backendId,
+    backends: [
+      { id: "preview-module", label: "LUXIS", connected: true, selected: controllerSnapshot.source?.backendId === "preview-module", state: "ready" },
+      { id: "preview-third-party", label: "示例控制器", connected: true, selected: controllerSnapshot.source?.backendId === "preview-third-party", state: "ready" }
+    ] };
+  const controllerSnapshotListeners = new Set<(snapshot: ControllerSnapshot) => void>();
+  const controllerStatusListeners = new Set<(status: ControllerModuleStatus) => void>();
   const controllerResult = (message: string, status: ControllerCommandResult["status"] = "Accepted"): ControllerCommandResult => ({ commandId: "preview", status, message, snapshot: { ...controllerSnapshot } });
   const applyHall = (request: HallRequest) => {
     Object.assign(controllerSnapshot.hall, request);
@@ -205,14 +226,30 @@ export function installPreviewBridge(expressionError: boolean): void {
     onUpdateStatus: () => () => {},
     controllerSnapshot: async () => controllerSnapshot,
     controllerStatus: async () => controllerStatus,
-    onControllerSnapshot: (callback: (snapshot: ControllerSnapshot) => void) => { callback(controllerSnapshot); return () => {}; },
-    onControllerStatus: (callback: (status: ControllerModuleStatus) => void) => { callback(controllerStatus); return () => {}; },
+    onControllerSnapshot: (callback: (snapshot: ControllerSnapshot) => void) => { controllerSnapshotListeners.add(callback); callback(controllerSnapshot); return () => controllerSnapshotListeners.delete(callback); },
+    onControllerStatus: (callback: (status: ControllerModuleStatus) => void) => { controllerStatusListeners.add(callback); callback(controllerStatus); return () => controllerStatusListeners.delete(callback); },
     controllerRescan: async () => ({ commandId: "preview", status: "Accepted", message: "已接受重新检测请求。", snapshot: controllerSnapshot }),
     controllerRetrySync: async () => ({ commandId: "preview", status: "Accepted", message: "已重新开始同步。", snapshot: controllerSnapshot }),
     controllerRestart: async () => {},
     controllerReleaseAll: async () => ({ commandId: "preview", status: "Verified", message: "虚拟按键已全部释放。", snapshot: controllerSnapshot }),
     controllerVirtualKey: async () => ({ commandId: "preview", status: "Accepted", message: "虚拟按键命令已接受。", snapshot: controllerSnapshot }),
     controllerSetMode: async (keyboardMouse: boolean) => { keyboardMouseCabGameMapping = controllerSnapshot.deviceConfig.cabGameMapping; controllerSnapshot.deviceConfig.isKmMode = keyboardMouse; controllerSnapshot.deviceConfig.cabGameMapping = keyboardMouseCabGameMapping; controllerSnapshot.state = "Ready"; return controllerResult(keyboardMouse ? "已切换到模拟键鼠模式。" : "已切换到 MU3IO 模式。"); },
+    controllerSetInputMode: async (modeId: string) => {
+      if (!controllerSnapshot.inputModes?.options.some(option => option.id === modeId)) return controllerResult("不支持该输入模式。", "Rejected");
+      controllerSnapshot.inputModes.current = modeId;
+      controllerSnapshot.deviceConfig.isKmMode = modeId === "keyboard";
+      for (const listener of controllerSnapshotListeners) listener({ ...controllerSnapshot });
+      return controllerResult("输入模式已更新。");
+    },
+    controllerSelectBackend: async (backendId: string) => {
+      if (!controllerStatus.backends?.some(backend => backend.id === backendId)) return controllerResult("未找到该控制器。", "Rejected");
+      controllerSnapshot = previewControllerSnapshot(backendId === "preview-third-party" ? "third-party" : "pico");
+      controllerStatus.selectedBackendId = backendId;
+      controllerStatus.backends = controllerStatus.backends.map(backend => ({ ...backend, selected: backend.id === backendId }));
+      for (const listener of controllerSnapshotListeners) listener(controllerSnapshot);
+      for (const listener of controllerStatusListeners) listener({ ...controllerStatus });
+      return controllerResult("已切换控制器。", "Verified");
+    },
     controllerSetBrightness: async (brightness: number) => { controllerSnapshot.deviceConfig.brightness = Math.max(0, Math.min(255, Math.round(brightness))); return controllerResult("亮度已即时应用。"); },
     controllerSetCustomColor: async (red: number, green: number, blue: number) => { controllerSnapshot.deviceConfig.groundColor = [red, green, blue]; controllerSnapshot.deviceConfig.sideColor = [red, green, blue]; return controllerResult("按键灯颜色已即时应用。"); },
     controllerSetPicoLighting: async (request: PicoLightingRequest) => { applyLighting(request); return controllerResult("灯光已即时应用。"); },

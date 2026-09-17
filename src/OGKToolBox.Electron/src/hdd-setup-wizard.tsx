@@ -80,6 +80,10 @@ export function HddSetupWizard({ root, snapshot, moduleStatus, onClose, onChange
     !["Disabled", "Searching", "BootloaderPending", "Faulted"].includes(snapshot.state);
   const supportedController = detectedController && snapshot.state !== "Unsupported";
   const controllerName = snapshot.identity.kind === "Pico" ? "LUXIS" : "NYAGEKI";
+  const otherControllerDetected = moduleStatus.state === "ready" && snapshot.identity.kind !== "Unknown" &&
+    !["Disabled", "Searching", "BootloaderPending", "Faulted"].includes(snapshot.state);
+  const manualControllerMessage = detectedController ? `已检测到 ${controllerName}，当前固件协议不受支持`
+    : otherControllerDetected ? `已检测到 ${snapshot.identity.displayName}，请选择游戏输入方式` : "未检测到支持的控制器";
   const stepIndex = steps.findIndex(item => item.id === step);
 
   useEffect(() => {
@@ -216,7 +220,7 @@ export function HddSetupWizard({ root, snapshot, moduleStatus, onClose, onChange
     if (step === "controller") {
       if (supportedController) return <><StepState ok={true}>已检测到 {controllerName}</StepState><p>将复制内置 NYAGEKI_IO.dll，关闭键盘与鼠标输入，并自动配置 MU3IO。{snapshot.identity.kind === "Pico" ? "LUXIS 的 Aime IO 也会设置为该 DLL。" : ""}</p><div className="hdd-actions"><button type="button" onClick={() => advance("server")}>上一步</button><button type="button" className="primary" disabled={busy} onClick={configureController}>自动配置控制器</button></div></>;
       const choices = [["mu3io", "选择 MU3IO DLL", "从本机选择 DLL，复制到 package 并写入其文件名。"], ["keyboard", "使用键盘鼠标", "启用 Segatools 键盘输入和鼠标模拟摇杆。"], ["io4", "使用 IO4 / 暂不配置", "不修改当前输入配置，直接完成向导。"]] as const;
-      return <><StepState ok={false}>{detectedController ? `已检测到 ${controllerName}，当前固件协议不受支持` : "未检测到支持的控制器"}</StepState><div className="hdd-choice-list is-detailed">{choices.map(([value, title, detail]) => <button type="button" key={value} className={controllerChoice === value ? "is-selected" : ""} onClick={() => chooseControllerOption(value)} disabled={busy}><i aria-hidden="true" /><span><b>{title}</b><small>{value === "mu3io" && selectedMu3ioFile ? `已选择 ${selectedMu3ioFile}` : detail}</small></span></button>)}</div><div className="hdd-actions"><button type="button" onClick={() => advance("server")}>上一步</button><button type="button" className="primary" disabled={busy || !controllerChoice} onClick={applyControllerChoice}>{controllerChoice === "io4" ? "使用 IO4 / 直接下一步" : "应用并完成"}</button></div></>;
+      return <><StepState ok={false}>{manualControllerMessage}</StepState><div className="hdd-choice-list is-detailed">{choices.map(([value, title, detail]) => <button type="button" key={value} className={controllerChoice === value ? "is-selected" : ""} onClick={() => chooseControllerOption(value)} disabled={busy}><i aria-hidden="true" /><span><b>{title}</b><small>{value === "mu3io" && selectedMu3ioFile ? `已选择 ${selectedMu3ioFile}` : detail}</small></span></button>)}</div><div className="hdd-actions"><button type="button" onClick={() => advance("server")}>上一步</button><button type="button" className="primary" disabled={busy || !controllerChoice} onClick={applyControllerChoice}>{controllerChoice === "io4" ? "使用 IO4 / 直接下一步" : "应用并完成"}</button></div></>;
     }
     if (step === "incomplete") return <div className="hdd-finish is-incomplete"><span aria-hidden="true">!</span><h3>配置未完成</h3><p>未安装 Segatools，且目标目录中没有可继续配置的 segatools.ini。</p><button type="button" className="primary" onClick={onClose}>关闭</button></div>;
     return <div className="hdd-finish"><span aria-hidden="true">✓</span><h3>配置完成</h3><p>Segatools、数据目录、网络和输入设备已按你的选择完成配置。</p><button type="button" className="primary" onClick={onClose}>完成</button></div>;

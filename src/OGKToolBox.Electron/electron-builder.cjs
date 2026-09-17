@@ -4,6 +4,14 @@ const repo = process.env.OGK_GITHUB_REPO || "OGKToolBox-releases";
 const config = {
   appId: "com.ogk.toolbox",
   productName: "OGK ToolBox",
+  npmRebuild: false,
+  asarUnpack: [
+    "dist-electron/electron/providers/**/*",
+    "dist-electron/electron/simgeki-io4-controller.js",
+    "dist-electron/sdk/**/*",
+    "node_modules/node-hid/**/*",
+    "node_modules/pkg-prebuilds/**/*"
+  ],
   icon: "build/toolbox-icon.ico",
   win: { icon: "build/toolbox-icon.ico", target: ["nsis"] },
   nsis: {

@@ -39,11 +39,14 @@ npm run dev
 
 详情见 [架构](docs/ARCHITECTURE.md)、[发布](docs/RELEASING.md)。
 
-## 其他控制器
+## 控制器支持
 
-开发者可通过独立进程接口接入其他控制器，无需原控制器源码。提供了 MIT 授权的 SDK、
-只读模拟示例和[接入文档](docs/CONTROLLER-PROVIDERS.md)。使用 `OGK_CONTROLLER_MODULE_DIR`
-显式选择模块，默认使用内置模块。
+控制器通过统一的应用层接口接入，界面可选择当前使用的后端。现有控制器模块和 IO4 提供者
+分别在独立进程中运行；SimGEKI / IO4 的设备匹配、输入与模式配置见[通信说明](docs/SIMGEKI-IO4.md)。
+
+开发者可用 [SDK 和模拟示例](docs/CONTROLLER-PROVIDERS.md) 添加自己的控制器提供者，
+也可用独立 EXE 实现同一接口。SDK 提供通信框架，设备读写及依赖由适配器实现；
+模拟器测试不等于真实硬件兼容性验证。
 
 ## 用户数据
 

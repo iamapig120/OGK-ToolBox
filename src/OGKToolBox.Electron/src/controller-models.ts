@@ -6,7 +6,18 @@ export type ControllerState =
 export type ControllerKind = "Unknown" | "Leonardo" | "Pico" | (string & {});
 export type CommandResultStatus = "Rejected" | "Accepted" | "Verified" | "Failed";
 
+export type ControllerInputModes = { current: string; options: { id: string; label: string }[] };
+export type ControllerBackendState = "starting" | "ready" | "fault" | "restarting" | "stopped";
+export type ControllerBackendView = {
+  id: string; label: string; connected: boolean; selected: boolean;
+  state: ControllerBackendState; error?: string;
+};
+
 export type ControllerSnapshot = {
+  /** Assigned by the application; connectionId is scoped to the current connection, not hardware serial. */
+  source?: { backendId: string; connectionId: string };
+  /** Optional v1 extension; older providers retain the boolean mode command. */
+  inputModes?: ControllerInputModes;
   sequence: number;
   sampledAt: string;
   state: ControllerState;
@@ -69,8 +80,10 @@ export type ControllerCommandResult = {
 };
 
 export type ControllerModuleStatus = {
-  state: "starting" | "ready" | "fault" | "restarting" | "stopped";
+  state: ControllerBackendState;
   error?: string;
+  selectedBackendId?: string;
+  backends?: ControllerBackendView[];
 };
 
 export type PicoLightingRequest = {

@@ -4,6 +4,16 @@ import { execFile } from "node:child_process";
 import { createServer } from "node:net";
 import path from "node:path";
 import { resolveControllerProvider } from "./controller-provider";
+import type { ControllerBackend, ControllerCommand } from "./controller-backend";
+import { emptyControllerSnapshot, withControllerModes } from "../src/controller-state";
+
+export type ControllerProcessTarget = {
+  directory: string; executable: string; prefixArgs: string[]; node: boolean; manifestPath?: string;
+};
+export type ControllerModuleOptions = {
+  id?: string; label?: string;
+  resolveTarget?: () => Promise<ControllerProcessTarget>;
+};
 import type {
   ControllerCommandResult, ControllerModuleStatus, ControllerSnapshot, HallRequest, LeverRequest,
   PicoLightingRequest
@@ -15,12 +25,19 @@ type StatusListener = (status: ControllerModuleStatus) => void;
 
 const requestTimeouts = { command: 5000, health: 3000, shutdown: 750, release: 500 } as const;
 
-export class ControllerModuleManager {
+export class ControllerModuleManager implements ControllerBackend {
+  readonly id: string;
+  readonly label: string;
+  constructor(private readonly options: ControllerModuleOptions = {}) {
+    this.id = options.id ?? "builtin";
+    this.label = options.label ?? "NYAGEKI / LUXIS";
+  }
   private child?: import("node:child_process").ChildProcessWithoutNullStreams;
   private address?: string;
   private readonly sessionToken = randomBytes(32).toString("base64url");
   private readonly instanceId = randomUUID();
   private starting?: Promise<void>;
+  private stoppingTask?: Promise<void>;
   private startAbort?: AbortController;
   private restartTimer?: ReturnType<typeof setTimeout>;
   private restartAttempt = 0;
@@ -31,12 +48,13 @@ export class ControllerModuleManager {
   private readonly statusListeners = new Set<StatusListener>();
   private status: ControllerModuleStatus = { state: "stopped" };
 
-  getSnapshot(): ControllerSnapshot | null { return this.snapshot ?? null; }
+  getSnapshot(): ControllerSnapshot | null { return this.snapshot ? withControllerModes(this.snapshot) : null; }
   getStatus(): ControllerModuleStatus { return this.status; }
-  onSnapshot(listener: Listener): () => void { this.listeners.add(listener); if (this.snapshot) listener(this.snapshot); return () => this.listeners.delete(listener); }
+  onSnapshot(listener: Listener): () => void { this.listeners.add(listener); if (this.snapshot) listener(withControllerModes(this.snapshot)); return () => this.listeners.delete(listener); }
   onStatus(listener: StatusListener): () => void { this.statusListeners.add(listener); listener(this.status); return () => this.statusListeners.delete(listener); }
 
   start(): Promise<void> {
+    if (this.stoppingTask) return this.stoppingTask.then(() => this.start());
     if (this.starting) return this.starting;
     if (!this.stopping && this.child && this.child.exitCode === null && this.address) return Promise.resolve();
     if (this.child && this.child.exitCode === null) return this.stop().then(() => this.start());
@@ -73,7 +91,8 @@ export class ControllerModuleManager {
   async releaseAll() { return this.command<ControllerCommandResult>("/api/v1/commands/release-all"); }
   async releaseAllIfRunning(): Promise<void> {
     if (!this.address || this.stopping) return;
-    await this.request<ControllerCommandResult>("/api/v1/commands/release-all", { method: "POST" }, requestTimeouts.release).then(() => undefined);
+    const result = await this.request<ControllerCommandResult>("/api/v1/commands/release-all", { method: "POST" }, requestTimeouts.release);
+    if (result?.status !== "Verified") throw new Error(result?.message || "控制器未能确认释放输入。");
   }
   async setVirtualKey(key: string, pressed: boolean) { return this.command<ControllerCommandResult>("/api/v1/commands/virtual-key", { key: controllerString(key, "key"), pressed: controllerBoolean(pressed, "pressed") }); }
   async setMode(keyboardMouse: boolean) { return this.command<ControllerCommandResult>("/api/v1/commands/mode", { keyboardMouse: controllerBoolean(keyboardMouse, "keyboardMouse") }); }
@@ -110,7 +129,45 @@ export class ControllerModuleManager {
   async leverCalibration(action: string) { return this.command<ControllerCommandResult>("/api/v1/commands/lever-calibration", { action: controllerString(action, "action") }); }
   async bootloader() { return this.command<ControllerCommandResult>("/api/v1/commands/bootloader"); }
 
-  async stop(): Promise<void> {
+  async execute(command: ControllerCommand): Promise<ControllerCommandResult> {
+    switch (command.name) {
+      case "rescan": return this.rescan();
+      case "retry-sync": return this.retrySync();
+      case "release-all": return this.releaseAll();
+      case "virtual-key": return this.setVirtualKey(command.key, command.pressed);
+      case "mode": return this.setMode(command.keyboardMouse);
+      case "input-mode": return this.setInputMode(command.modeId);
+      case "brightness": return this.setBrightness(command.brightness);
+      case "custom-color": return this.setCustomColor(command.red, command.green, command.blue);
+      case "pico-lighting": return this.setPicoLighting(command.request);
+      case "hall": return this.setHall(command.request);
+      case "lever": return this.setLever(command.request);
+      case "hall-calibration": return this.hallCalibration(command.action);
+      case "lever-calibration": return this.leverCalibration(command.action);
+      case "hall-query": return this.hallQuery();
+      case "device-query": return this.deviceQuery();
+      case "bootloader": return this.bootloader();
+    }
+  }
+
+  async setInputMode(modeId: string): Promise<ControllerCommandResult> {
+    const snapshot = this.getSnapshot();
+    if (typeof modeId !== "string" || !snapshot?.canWrite || !snapshot.capabilities.mode ||
+      !snapshot.inputModes?.options.some(option => option.id === modeId))
+      return { commandId: randomUUID(), status: "Rejected", message: "当前控制器不支持此输入模式。", snapshot: snapshot ?? emptyControllerSnapshot() };
+    // The old Host understands /mode with a boolean. Never send it a new endpoint.
+    if (!this.snapshot?.inputModes) return this.setMode(modeId === "keyboard");
+    return this.command<ControllerCommandResult>("/api/v1/commands/input-mode", { modeId });
+  }
+
+  stop(): Promise<void> {
+    if (this.stoppingTask) return this.stoppingTask;
+    const task = this.stopCore().finally(() => { if (this.stoppingTask === task) this.stoppingTask = undefined; });
+    this.stoppingTask = task;
+    return task;
+  }
+
+  private async stopCore(): Promise<void> {
     this.stopping = true;
     this.clearRestartTimer();
     this.streamAbort?.abort();
@@ -140,14 +197,15 @@ export class ControllerModuleManager {
       const moduleDirectory = app.isPackaged
         ? path.join(process.resourcesPath, "controller")
         : path.resolve(__dirname, "../../resources/controller");
-      const provider = await resolveControllerProvider(moduleDirectory, app.getVersion(),
-        process.env.OGK_CONTROLLER_MODULE_DIR, process.execPath);
+      const provider = this.options.resolveTarget ? await this.options.resolveTarget()
+        : await resolveControllerProvider(moduleDirectory, app.getVersion(), process.env.OGK_CONTROLLER_MODULE_DIR, process.execPath);
       if (signal.aborted || this.stopping) throw new Error("控制器模块启动已取消。");
       const port = await reservePort();
       if (signal.aborted || this.stopping) throw new Error("控制器模块启动已取消。");
       const { spawn } = await import("node:child_process");
+      if (signal.aborted || this.stopping) throw new Error("控制器模块启动已取消。");
       const spawned = spawn(provider.executable, [...provider.prefixArgs, "--port", String(port), "--session-token", this.sessionToken,
-        "--instance-id", this.instanceId, "--parent-pid", String(process.pid), "--software-version", app.getVersion(), "--manifest", provider.manifestPath], {
+        "--instance-id", this.instanceId, "--parent-pid", String(process.pid), "--software-version", app.getVersion(), ...(provider.manifestPath ? ["--manifest", provider.manifestPath] : [])], {
           cwd: provider.directory, windowsHide: true, env: { ...process.env, ...(provider.node ? { ELECTRON_RUN_AS_NODE: "1" } : {}) }
         });
       child = spawned;
@@ -254,20 +312,33 @@ export class ControllerModuleManager {
     await this.start();
     const init: RequestInit = { method: "POST" };
     if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { "Content-Type": "application/json" }; }
-    return this.request<T>(endpoint, init, requestTimeouts.command);
+    const child = this.child;
+    const result = await this.request<T>(endpoint, init, requestTimeouts.command);
+    if (!this.stopping && child === this.child && result && typeof result === "object" && "snapshot" in result) {
+      const snapshot = (result as { snapshot: ControllerSnapshot }).snapshot;
+      if (snapshot && (!this.snapshot || snapshot.sequence >= this.snapshot.sequence)) this.publish(snapshot);
+    }
+    return result;
   }
 
   private async request<T>(endpoint: string, init: RequestInit = {}, timeout: number = requestTimeouts.command): Promise<T> {
     if (!this.address) throw new Error("控制器服务尚未就绪。");
-    const response = await this.requestTo(this.address, endpoint, init, timeout);
-    if (!response.ok) throw new Error(await this.errorMessage(response, endpoint));
-    if (response.status === 204) return undefined as T;
-    return await response.json() as T;
+    return this.withResponse(this.address, endpoint, init, timeout, async response => {
+      if (!response.ok) throw new Error(await this.errorMessage(response, endpoint));
+      if (response.status === 204) return undefined as T;
+      return await response.json() as T;
+    });
   }
 
   private async requestDirect<T>(endpoint: string, timeout: number, signal?: AbortSignal): Promise<T> { return this.request<T>(endpoint, signal ? { signal } : {}, timeout); }
 
-  private async requestTo(address: string, endpoint: string, init: RequestInit, timeout: number): Promise<Response> {
+  private requestTo(address: string, endpoint: string, init: RequestInit, timeout: number): Promise<Response> {
+    // SSE keeps a deadline for headers only; ordinary JSON requests include body consumption.
+    return this.withResponse(address, endpoint, init, timeout, async response => response);
+  }
+
+  private async withResponse<T>(address: string, endpoint: string, init: RequestInit, timeout: number,
+    consume: (response: Response) => Promise<T>): Promise<T> {
     const abort = new AbortController();
     const upstream = init.signal;
     const onAbort = () => abort.abort(upstream?.reason);
@@ -275,8 +346,9 @@ export class ControllerModuleManager {
     if (upstream?.aborted) onAbort();
     const timer = setTimeout(() => abort.abort(), timeout);
     try {
-      return await fetch(`${address}${endpoint}`, { ...init, redirect: "error", signal: abort.signal,
+      const response = await fetch(`${address}${endpoint}`, { ...init, redirect: "error", signal: abort.signal,
         headers: { "X-OGK-Controller-Session": this.sessionToken, ...(init.headers ?? {}) } });
+      return await consume(response);
     } catch (error) {
       if (abort.signal.aborted && !upstream?.aborted) throw new Error(`控制器请求超时：${endpoint}`);
       throw error;
@@ -340,7 +412,7 @@ export class ControllerModuleManager {
     if (!signal.aborted) throw new Error("控制器实时数据流已断开。");
   }
 
-  private publish(snapshot: ControllerSnapshot): void { this.snapshot = snapshot; for (const listener of this.listeners) listener(snapshot); }
+  private publish(snapshot: ControllerSnapshot): void { this.snapshot = snapshot; for (const listener of this.listeners) listener(withControllerModes(snapshot)); }
   private setStatus(status: ControllerModuleStatus): void { this.status = status; for (const listener of this.statusListeners) listener(status); }
   private async errorMessage(response: Response, endpoint: string): Promise<string> {
     const raw = await response.text().catch(() => "");

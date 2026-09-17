@@ -54,7 +54,8 @@ test('rejects path traversal and unknown runtimes before launch', async t => {
 
 test('actual manager starts third-party provider, receives input, rejects unsupported writes and stops', { timeout: 15000 }, async t => {
   const { ControllerModuleManager } = load('controller-module-manager', {
-    electron: { app: { isPackaged: false, getVersion: () => '1.1.7' } }, './controller-provider': resolver
+    electron: { app: { isPackaged: false, getVersion: () => '1.1.7' } }, './controller-provider': resolver,
+    '../src/controller-state': load('../src/controller-state')
   }, { process: { ...process, execPath: require('electron'), env: { ...process.env, OGK_CONTROLLER_MODULE_DIR: example } } });
   const manager = new ControllerModuleManager();
   t.after(() => manager.stop());

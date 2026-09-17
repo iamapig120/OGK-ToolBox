@@ -578,6 +578,7 @@
 .primary-action { border-color: #d94c1b !important; background: #d94c1b !important; color: #fff !important; }
 
 .controller-accordions { position: relative; top: -1px; display: grid; height: 175px; min-height: 175px; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.controller-accordions .input-only-accordion { grid-column: 1 / -1; }
 .controller-accordion { height: 160px; min-height: 160px; padding: 12px 14px; }
 .lighting-accordion { position: relative; height: 175px; min-height: 175px; }
 .joystick-accordion { position: relative; margin-top: 15px; }
@@ -772,6 +773,23 @@
 .input-mode-segmented { display: flex; height: 40px; min-width: 227px; gap: 3px; padding: 3px; border-radius: 6px; background: #eef2f7; }
 .input-mode-segmented button { height: 34px; min-height: 34px; flex: 1; padding: 0 10px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: #657386; font: 700 14px/20px Inter, "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", sans-serif; box-shadow: none; }
 .input-mode-segmented button.selected { border-color: #dce2ea; background: #fff; color: #263244; }
+.controller-mode-control { min-width: 0; max-width: 100%; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.controller-mode-control > .controller-prompt-error { font-size: 12px; line-height: 1.5; text-align: left; overflow-wrap: anywhere; }
+.controller-input-modes { min-width: 0; height: auto; flex-wrap: wrap; max-width: 100%; }
+.controller-input-modes button { flex: 1 0 auto; max-width: 100%; white-space: normal; overflow-wrap: anywhere; height: auto; }
+.info-row.controller-mode-row { height: auto; flex-wrap: wrap; gap: 8px; padding-top: 5px; padding-bottom: 5px; }
+.controller-mode-row > b { flex: 1; justify-content: flex-end; }
+.controller-device-choice { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 16px; }
+.controller-device-choice > span { color: #657386; font-size: 13px; }
+.controller-device-selector { min-width: 0; height: auto; max-width: 100%; flex-wrap: wrap; }
+.controller-device-selector button { display: flex; flex: 0 1 auto; min-width: 96px; max-width: 260px; align-items: center; justify-content: center; gap: 8px; height: auto; white-space: normal; overflow-wrap: anywhere; }
+.controller-device-selector small { font-size: 12px; font-weight: 400; }
+.controller-device-choice > .controller-prompt-error { flex-basis: 100%; margin: 0; }
+.controller-input-modes button:focus-visible,
+.controller-device-selector button:focus-visible { outline: 2px solid #d94c1b; outline-offset: 2px; }
+.controller-page .controller-key:disabled,
+.controller-page .monitor-action:disabled { opacity: 1; cursor: default; }
+.dark .controller-device-choice > span { color: #9eabb9; }
 
 .magnetic-content { gap: 10px; padding: 0; }
 .magnetic-content-header b { font-size: 20px; line-height: 26px; }

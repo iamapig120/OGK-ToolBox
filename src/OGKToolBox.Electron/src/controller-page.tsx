@@ -19,45 +19,61 @@ const emptySnapshot = (): ControllerSnapshot => ({
 let cachedControllerSnapshot = emptySnapshot();
 let cachedControllerModuleStatus: ControllerModuleStatus = { state: "starting" };
 
-type ControllerCommandInvoker = (task: () => Promise<ControllerCommandResult>) => Promise<ControllerCommandResult | undefined>;
+type ControllerCommandInvoker = (task: () => Promise<ControllerCommandResult>, options?: { allowConnectionChange?: boolean }) => Promise<ControllerCommandResult | undefined>;
+const controllerConnectionKey = (snapshot: ControllerSnapshot) => snapshot.source
+  ? `${snapshot.source.backendId}:${snapshot.source.connectionId}` : snapshot.identity.kind;
 
 export function useController(): { snapshot: ControllerSnapshot; moduleStatus: ControllerModuleStatus; invoke: ControllerCommandInvoker } {
   const [snapshot, setSnapshot] = useState<ControllerSnapshot>(() => cachedControllerSnapshot);
   const [moduleStatus, setModuleStatus] = useState<ControllerModuleStatus>(() => cachedControllerModuleStatus);
   useEffect(() => {
     let active = true;
+    let snapshotReceived = false;
+    let statusReceived = false;
     void window.ogk.controllerSnapshot().then(value => {
-      if (!value) return;
+      if (!active || snapshotReceived || !value) return;
       cachedControllerSnapshot = value;
       if (active) setSnapshot(value);
     }).catch(() => {});
     void window.ogk.controllerStatus().then(value => {
+      if (!active || statusReceived) return;
       cachedControllerModuleStatus = value;
       if (active) setModuleStatus(value);
     }).catch(error => {
+      if (!active || statusReceived) return;
       const fault = { state: "fault", error: error instanceof Error ? error.message : String(error) } as ControllerModuleStatus;
       cachedControllerModuleStatus = fault;
       if (active) setModuleStatus(fault);
     });
     const removeSnapshot = window.ogk.onControllerSnapshot(value => {
+      snapshotReceived = true;
       cachedControllerSnapshot = value;
       if (active) setSnapshot(value);
     });
     const removeStatus = window.ogk.onControllerStatus(value => {
+      statusReceived = true;
       cachedControllerModuleStatus = value;
       if (active) setModuleStatus(value);
     });
     return () => { active = false; removeSnapshot(); removeStatus(); };
   }, []);
-  const invoke = useCallback(async (task: () => Promise<ControllerCommandResult>) => {
+  const invoke: ControllerCommandInvoker = useCallback(async (task, options) => {
+    const connection = controllerConnectionKey(cachedControllerSnapshot);
     try {
       const result = await task();
+      // A late command response from an old connection cannot hydrate the new device's UI.
+      const currentConnection = controllerConnectionKey(cachedControllerSnapshot);
+      const resultConnection = controllerConnectionKey(result.snapshot);
+      if (options?.allowConnectionChange
+        ? currentConnection !== connection && resultConnection !== currentConnection
+        : connection !== currentConnection || connection !== resultConnection) return undefined;
       cachedControllerSnapshot = result.snapshot;
       setSnapshot(result.snapshot);
       return result;
     }
     catch (error) {
-      cachedControllerModuleStatus = { state: "fault", error: error instanceof Error ? error.message : String(error) };
+      if (connection !== controllerConnectionKey(cachedControllerSnapshot)) return undefined;
+      cachedControllerModuleStatus = { ...cachedControllerModuleStatus, state: "fault", error: error instanceof Error ? error.message : String(error) };
       setModuleStatus(cachedControllerModuleStatus);
       return undefined;
     }
@@ -213,8 +229,17 @@ export function ControllerStatusCard(): ReactElement {
   return <article className={`surface status controller-status-card ${online ? "is-online" : "muted"}`}><span className="status-leading"><PencilGamepadIcon /></span><div><small>控制器</small><b>{text}</b><span>{note}</span></div><span className={`status-result ${online ? "ok" : ""}`} aria-label={online ? "已连接" : "未连接"}>{online ? <PencilCheckIcon /> : <PencilCloseIcon />}</span></article>;
 }
 
-export function ControllerPage({ gameRoot = "", onConfigurationChanged }: ControllerPageProps): ReactElement {
-  const { snapshot, moduleStatus, invoke } = useController();
+export function ControllerPage(props: ControllerPageProps): ReactElement {
+  const controller = useController();
+  return <ControllerWorkspace key={controllerConnectionKey(controller.snapshot)} {...props} controller={controller} />;
+}
+
+function ControllerWorkspace({ gameRoot = "", onConfigurationChanged, controller }: ControllerPageProps & {
+  controller: ReturnType<typeof useController>;
+}): ReactElement {
+  const { snapshot, moduleStatus, invoke } = controller;
+  const workspaceActive = useRef(true);
+  const connection = controllerConnectionKey(snapshot);
   const resolvedGameRoot = gameRoot || window.localStorage.getItem("ogk-toolbox.game-root.v1") || "";
   const [gameProcesses, setGameProcesses] = useState<string[]>([]);
   const [inspectorTab, setInspectorTab] = useState<"info" | "magnetic">("info");
@@ -240,16 +265,24 @@ export function ControllerPage({ gameRoot = "", onConfigurationChanged }: Contro
   const controllerRevealPending = useRef(false);
   const promptedControllerKind = useRef<ControllerSnapshot["identity"]["kind"]>("Unknown");
   const connectedKind = useRef<ControllerSnapshot["identity"]["kind"]>("Unknown");
-  const command = (task: () => Promise<ControllerCommandResult>) => invoke(task);
+  const command: ControllerCommandInvoker = (task, options) => {
+    if (!workspaceActive.current || connection !== controllerConnectionKey(cachedControllerSnapshot)) return Promise.resolve(undefined);
+    return invoke(task, options);
+  };
   const releaseAll = useCallback(() => { void window.ogk.controllerReleaseAll().catch(() => {}); }, []);
   const connected = moduleStatus.state === "ready" && isOnline(snapshot);
   const keyboardOnly = !connected && keyboardInputEnabled;
-  const connectedDeviceName = snapshot.identity.kind === "Leonardo" ? "NYAGEKI" : snapshot.identity.kind === "Pico" ? "LUXIS" : null;
+  const connectedDeviceName = snapshot.identity.kind === "Leonardo" ? "NYAGEKI" : snapshot.identity.kind === "Pico" ? "LUXIS" :
+    snapshot.identity.kind === "SimGEKI" ? "SimGEKI" : snapshot.identity.kind === "IO4Compatible" ? "IO4" : null;
 
-  useEffect(() => () => {
-    if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
-    if (keyboardNoticeTimer.current !== null) window.clearTimeout(keyboardNoticeTimer.current);
-    if (controllerRevealTimer.current !== null) window.clearTimeout(controllerRevealTimer.current);
+  useEffect(() => {
+    workspaceActive.current = true;
+    return () => {
+      workspaceActive.current = false;
+      if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
+      if (keyboardNoticeTimer.current !== null) window.clearTimeout(keyboardNoticeTimer.current);
+      if (controllerRevealTimer.current !== null) window.clearTimeout(controllerRevealTimer.current);
+    };
   }, []);
   useEffect(() => {
     let active = true;
@@ -466,10 +499,10 @@ export function ControllerPage({ gameRoot = "", onConfigurationChanged }: Contro
        ["R_Side", keyboardMouse ? keyboardLabel("R_Side", "R-CLK") : "SIDE", snapshot.input.rightSide || (keyboardOnly && keyboardHeldKeys.has("R_Side")), "right-side", keyboardMouse ? null : "j"]
     ] as const;
   }, [connected, keyboardInputEnabled, keyboardOnly, keyboardHeldKeys, keyboardBindings, snapshot.deviceConfig.isKmMode, snapshot.input]);
-  const press = (key: string, event: React.PointerEvent<HTMLButtonElement>) => { event.currentTarget.setPointerCapture(event.pointerId); void command(() => window.ogk.controllerVirtualKey(key, true)); };
-  const release = (key: string) => { void command(() => window.ogk.controllerVirtualKey(key, false)); };
-  const pressFromKeyboard = (key: string, event: React.KeyboardEvent<HTMLButtonElement>) => { if (event.repeat) return; event.preventDefault(); void command(() => window.ogk.controllerVirtualKey(key, true)); };
-  const releaseFromKeyboard = (key: string, event: React.KeyboardEvent<HTMLButtonElement>) => { event.preventDefault(); void command(() => window.ogk.controllerVirtualKey(key, false)); };
+  const press = (key: string, event: React.PointerEvent<HTMLButtonElement>) => { if (!snapshot.capabilities.virtualKeys) return; event.currentTarget.setPointerCapture(event.pointerId); void command(() => window.ogk.controllerVirtualKey(key, true)); };
+  const release = (key: string) => { if (snapshot.capabilities.virtualKeys) void command(() => window.ogk.controllerVirtualKey(key, false)); };
+  const pressFromKeyboard = (key: string, event: React.KeyboardEvent<HTMLButtonElement>) => { if (event.repeat || !snapshot.capabilities.virtualKeys) return; event.preventDefault(); void command(() => window.ogk.controllerVirtualKey(key, true)); };
+  const releaseFromKeyboard = (key: string, event: React.KeyboardEvent<HTMLButtonElement>) => { if (!snapshot.capabilities.virtualKeys) return; event.preventDefault(); void command(() => window.ogk.controllerVirtualKey(key, false)); };
   const rescan = () => {
     if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
     refreshStartedAt.current = Date.now();
@@ -575,8 +608,9 @@ export function ControllerPage({ gameRoot = "", onConfigurationChanged }: Contro
   return <div className={`controller-page ${connected ? "is-connected" : "is-disconnected"} ${keyboardOnly ? "is-keyboard-input" : ""} ${configurationReadbackPending ? "is-config-readback" : ""}`}>
      <div className="controller-page-header">
        <div><h1 key={connected ? "connected" : keyboardOnly ? "keyboard-input" : "disconnected"}>控制器</h1><p>{connected ? "Signal-first tuning console · 1440 × 900" : keyboardOnly ? "已启用 Segatools 键盘输入 · 未连接硬件控制器" : "未检测到兼容控制器 · 请连接设备后重新扫描"}</p></div>
-       <div className="controller-page-actions"><span className="controller-supported-devices">{!connected && <span>已支持设备：</span>}{(!connected || connectedDeviceName === "NYAGEKI") && <b className={`controller-supported-device ${connectedDeviceName === "NYAGEKI" && connected ? "is-connected" : ""}`}>NYAGEKI</b>}{(!connected || connectedDeviceName === "LUXIS") && <b className={`controller-supported-device ${connectedDeviceName === "LUXIS" && connected ? "is-connected" : ""}`}>LUXIS</b>}</span>{connected ? <button type="button" className="controller-refresh" disabled={refreshing} onClick={rescan}>刷新设备</button> : <span className={`connection-chip ${keyboardOnly ? "is-keyboard-input" : ""}`}><i />{keyboardOnly ? "键盘输入" : "未连接"}</span>}</div>
+       <div className="controller-page-actions"><span className="controller-supported-devices">{!connected && <span>已支持设备：</span>}{(["NYAGEKI", "LUXIS", "SimGEKI", "IO4"] as const).map(name => (!connected || connectedDeviceName === name) && <b key={name} className={`controller-supported-device ${connectedDeviceName === name && connected ? "is-connected" : ""}`}>{name}</b>)}</span>{connected ? <button type="button" className="controller-refresh" disabled={refreshing} onClick={rescan}>刷新设备</button> : <span className={`connection-chip ${keyboardOnly ? "is-keyboard-input" : ""}`}><i />{keyboardOnly ? "键盘输入" : "未连接"}</span>}</div>
      </div>
+     <ControllerDeviceSelector status={moduleStatus} command={command} />
      {keyboardInputNotice && <div className="controller-config-toast" role="status" aria-live="polite">{keyboardInputNotice}</div>}
      {connected || keyboardOnly ? <>
        <div className={`controller-transition-shell ${transitionLoading ? "is-loading" : "is-ready"}`} aria-busy={transitionLoading}>
@@ -591,8 +625,64 @@ export function ControllerPage({ gameRoot = "", onConfigurationChanged }: Contro
 
 type VirtualButton = readonly [string, string, boolean, string, string | null];
 
+export function ControllerDeviceSelector({ status, command }: {
+  status: ControllerModuleStatus; command: ControllerCommandInvoker;
+}): ReactElement | null {
+  const [selecting, setSelecting] = useState(false);
+  const [error, setError] = useState("");
+  if (!status.backends || status.backends.length < 2) return null;
+  const select = async (backendId: string) => {
+    setSelecting(true); setError("");
+    const result = await command(() => window.ogk.controllerSelectBackend(backendId), { allowConnectionChange: true });
+    if (result?.status === "Failed" || result?.status === "Rejected") setError(result.message);
+    setSelecting(false);
+  };
+  return <div className="controller-device-choice">
+    <span>当前设备</span>
+    <div className="input-mode-segmented controller-device-selector" role="group" aria-label="选择控制器" aria-busy={selecting}>
+      {status.backends.map(backend => <button type="button" key={backend.id}
+        className={backend.selected ? "selected" : ""} aria-pressed={backend.selected}
+        disabled={selecting} onClick={() => { if (!backend.selected) void select(backend.id); }}>
+        <span>{backend.label}</span>{!backend.connected && <small>{backend.state === "fault" ? "不可用" : "未连接"}</small>}
+      </button>)}
+    </div>
+    {error && <p className="controller-prompt-error" role="alert">{error}</p>}
+  </div>;
+}
+
+export function ControllerModeControl({ snapshot, command, readOnly = false }: {
+  snapshot: ControllerSnapshot; command: ControllerCommandInvoker; readOnly?: boolean;
+}): ReactElement {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const modes = snapshot.inputModes;
+  const current = modes?.options.find(option => option.id === modes.current)?.label ?? "未提供";
+  const writable = !readOnly && snapshot.capabilities.mode && snapshot.canWrite && !!modes?.options.length;
+  const setMode = async (id: string) => {
+    setPending(true);
+    setError("");
+    try {
+      const result = await command(() => window.ogk.controllerSetInputMode(id));
+      if (!result) setError("输入模式切换未完成，请重试。");
+      else if (result.status === "Failed" || result.status === "Rejected")
+        setError(result.message || "输入模式切换失败，请重试。");
+    }
+    catch (error) { setError(error instanceof Error ? error.message : String(error)); }
+    finally { setPending(false); }
+  };
+  return <div className="controller-mode-control">
+    {writable && modes ? <div className="input-mode-segmented controller-input-modes" role="group" aria-label="输入模式" aria-busy={pending}>
+      {modes.options.map(option => <button type="button" key={option.id}
+        className={modes.current === option.id ? "selected" : ""} aria-pressed={modes.current === option.id}
+        disabled={pending} onClick={() => { if (modes.current !== option.id) void setMode(option.id); }}>{option.label}</button>)}
+    </div> : <span>{current}</span>}
+    {error && <span className="controller-prompt-error" role="alert">{error}</span>}
+  </div>;
+}
+
 function InputMonitor({ snapshot, virtualButtons, keyboardHeldKeys, keyboardBindings, keyboardInputOnly = false, onPress, onRelease, onPressKeyboard, onReleaseKeyboard, onReleaseAll, inspectorTab, onInspectorTab, command }: { snapshot: ControllerSnapshot; virtualButtons: readonly VirtualButton[]; keyboardHeldKeys: ReadonlySet<string>; keyboardBindings: Readonly<Record<string, KeyboardBinding>>; keyboardInputOnly?: boolean; onPress(key: string, event: React.PointerEvent<HTMLButtonElement>): void; onRelease(key: string): void; onPressKeyboard(key: string, event: React.KeyboardEvent<HTMLButtonElement>): void; onReleaseKeyboard(key: string, event: React.KeyboardEvent<HTMLButtonElement>): void; onReleaseAll(): void; inspectorTab: "info" | "magnetic"; onInspectorTab(tab: "info" | "magnetic"): void; command: ControllerCommandInvoker }): ReactElement {
   const input = snapshot.input;
+  const virtualInput = !keyboardInputOnly && snapshot.capabilities.virtualKeys;
   const special = [["Test", keyboardInputOnly ? keyboardBindings.Test?.label ?? "TEST" : "TEST", input.test || (keyboardInputOnly && keyboardHeldKeys.has("Test")), " "], ["Service", keyboardInputOnly ? keyboardBindings.Service?.label ?? "SERVICE" : "SERVICE", input.service || (keyboardInputOnly && keyboardHeldKeys.has("Service")), "Enter"], ["Both", "BOTH", (input.test || (keyboardInputOnly && keyboardHeldKeys.has("Test"))) && (input.service || (keyboardInputOnly && keyboardHeldKeys.has("Service"))), ""]] as const;
   const magneticAvailable = snapshot.identity.kind === "Pico" && (snapshot.capabilities.hallConfiguration || isPicoConfigSyncing(snapshot));
   const activeInspectorTab = inspectorTab === "magnetic" && magneticAvailable ? "magnetic" : "info";
@@ -603,9 +693,9 @@ function InputMonitor({ snapshot, virtualButtons, keyboardHeldKeys, keyboardBind
         <div className="monitor-hardware-header"><span className={`monitor-online-badge ${keyboardInputOnly ? "is-keyboard-input" : ""}`} title={keyboardInputOnly ? "Segatools 键盘输入已启用" : snapshot.capabilities.bootloader ? "双击进入 Bootloader" : undefined} onDoubleClick={() => { if (!keyboardInputOnly && snapshot.capabilities.bootloader) void command(() => window.ogk.controllerBootloader()); }}><i />{keyboardInputOnly ? "KEYBOARD INPUT" : `${controllerDisplayName(snapshot)} ONLINE`}</span><span className="monitor-header-spacer" /></div>
         <div className="analog-lever-monitor"><span className="lever-end left">L</span><span className="lever-end right">R</span><b>{snapshot.deviceConfig.isKmMode ? "MOUSE X-AXIS" : "ANALOG LEVER"}</b><div className="analog-track" style={sliderPositionStyle(leverPercent(snapshot.input.mappedLever))}><i /></div></div>
         <div className="controller-button-layout">
-           {virtualButtons.map(([key, label, active, placement, shortcut]) => <button type="button" key={key} className={`controller-key ${placement} ${active ? "is-held" : ""}`} style={keyboardInputOnly ? undefined : monitorKeyStyle(snapshot, placement)} aria-pressed={active} aria-keyshortcuts={shortcut ?? undefined} onPointerDown={keyboardInputOnly ? undefined : event => onPress(key, event)} onPointerUp={keyboardInputOnly ? undefined : () => onRelease(key)} onPointerCancel={keyboardInputOnly ? undefined : () => onRelease(key)} onLostPointerCapture={keyboardInputOnly ? undefined : () => onRelease(key)} onKeyDown={keyboardInputOnly ? undefined : event => { if (shortcut && event.key.toLowerCase() === shortcut) onPressKeyboard(key, event); }} onKeyUp={keyboardInputOnly ? undefined : event => { if (shortcut && event.key.toLowerCase() === shortcut) onReleaseKeyboard(key, event); }} onBlur={keyboardInputOnly ? undefined : () => onRelease(key)}>{label}</button>)}
+           {virtualButtons.map(([key, label, active, placement, shortcut]) => <button type="button" key={key} disabled={!keyboardInputOnly && !virtualInput} className={`controller-key ${placement} ${active ? "is-held" : ""}`} style={keyboardInputOnly ? undefined : monitorKeyStyle(snapshot, placement)} aria-pressed={active} aria-keyshortcuts={virtualInput ? shortcut ?? undefined : undefined} onPointerDown={!virtualInput ? undefined : event => onPress(key, event)} onPointerUp={!virtualInput ? undefined : () => onRelease(key)} onPointerCancel={!virtualInput ? undefined : () => onRelease(key)} onLostPointerCapture={!virtualInput ? undefined : () => onRelease(key)} onKeyDown={!virtualInput ? undefined : event => { if (shortcut && event.key.toLowerCase() === shortcut) onPressKeyboard(key, event); }} onKeyUp={!virtualInput ? undefined : event => { if (shortcut && event.key.toLowerCase() === shortcut) onReleaseKeyboard(key, event); }} onBlur={!virtualInput ? undefined : () => onRelease(key)}>{label}</button>)}
         </div>
-        <div className="monitor-hardware-footer"><div className="monitor-footer-actions">{special.map(([key, label, active, shortcut]) => <button type="button" key={key} className={`monitor-action ${active ? "is-held" : ""}`} aria-pressed={active} aria-keyshortcuts={shortcut || undefined} onPointerDown={keyboardInputOnly ? undefined : event => onPress(key, event)} onPointerUp={keyboardInputOnly ? undefined : () => onRelease(key)} onPointerCancel={keyboardInputOnly ? undefined : () => onRelease(key)} onLostPointerCapture={keyboardInputOnly ? undefined : () => onRelease(key)} onKeyDown={keyboardInputOnly ? undefined : event => { if (shortcut && event.key === shortcut) onPressKeyboard(key, event); }} onKeyUp={keyboardInputOnly ? undefined : event => { if (shortcut && event.key === shortcut) onReleaseKeyboard(key, event); }} onBlur={keyboardInputOnly ? undefined : () => onRelease(key)}>{label}</button>)}</div></div>
+        <div className="monitor-hardware-footer"><div className="monitor-footer-actions">{special.map(([key, label, active, shortcut]) => <button type="button" key={key} disabled={!keyboardInputOnly && !virtualInput} className={`monitor-action ${active ? "is-held" : ""}`} aria-pressed={active} aria-keyshortcuts={virtualInput ? shortcut || undefined : undefined} onPointerDown={!virtualInput ? undefined : event => onPress(key, event)} onPointerUp={!virtualInput ? undefined : () => onRelease(key)} onPointerCancel={!virtualInput ? undefined : () => onRelease(key)} onLostPointerCapture={!virtualInput ? undefined : () => onRelease(key)} onKeyDown={!virtualInput ? undefined : event => { if (shortcut && event.key === shortcut) onPressKeyboard(key, event); }} onKeyUp={!virtualInput ? undefined : event => { if (shortcut && event.key === shortcut) onReleaseKeyboard(key, event); }} onBlur={!virtualInput ? undefined : () => onRelease(key)}>{label}</button>)}</div></div>
       </div>
       <aside className="monitor-inspector">
          <div className="inspector-tabs"><button type="button" disabled={keyboardInputOnly} className={activeInspectorTab === "info" ? "active" : "inactive"} onClick={() => onInspectorTab("info")}><span><ControllerGlyph name="memory" /></span>控制器信息</button>{magneticAvailable && <button type="button" disabled={keyboardInputOnly} className={activeInspectorTab === "magnetic" ? "active" : "inactive"} onClick={() => onInspectorTab("magnetic")}><span><ControllerGlyph name="tune" /></span>磁轴设置</button>}</div>
@@ -616,25 +706,23 @@ function InputMonitor({ snapshot, virtualButtons, keyboardHeldKeys, keyboardBind
 }
 
 function InformationPanel({ snapshot, command, keyboardInputOnly = false }: { snapshot: ControllerSnapshot; command: ControllerCommandInvoker; keyboardInputOnly?: boolean }): ReactElement {
-  const caps = snapshot.capabilities;
   const picoInformationAvailable = snapshot.identity.kind === "Pico" && !keyboardInputOnly;
   const kmMode = snapshot.deviceConfig.isKmMode;
   const currentMode = snapshot.identity.kind === "Pico"
     ? snapshot.deviceConfig.inputMode === 1 ? "微动模式" : "磁轴模式"
     : kmMode ? "模拟键鼠" : "MU3IO";
-  const modeWritable = isConfigurationUiWritable(snapshot) && caps.mode;
   return <div className="information-content">
     <div className="identity-box"><span>当前连接的控制器</span><b>{keyboardInputOnly ? "键盘" : controllerDisplayName(snapshot)}</b></div>
     <InfoRow label="控制器名称" value={keyboardInputOnly ? "—" : controllerDisplayName(snapshot)} />
     <InfoRow label="固件版本" value={snapshot.identity.firmware === "—" ? "—" : `v${snapshot.identity.firmware}`} />
-    <InfoRow label="输入模式" value={<div className="input-mode-segmented" role="group" aria-label="输入模式"><button type="button" className={!kmMode ? "selected" : ""} disabled={!modeWritable} onClick={() => void command(() => window.ogk.controllerSetMode(false))}>MU3IO</button><button type="button" className={kmMode ? "selected" : ""} disabled={!modeWritable} onClick={() => void command(() => window.ogk.controllerSetMode(true))}>模拟键鼠</button></div>} />
+    <InfoRow className="controller-mode-row" label="输入模式" value={<ControllerModeControl snapshot={snapshot} command={command} readOnly={keyboardInputOnly} />} />
     {(picoInformationAvailable || keyboardInputOnly) && <InfoRow label="读卡器卡号" value={keyboardInputOnly ? "—" : snapshot.card.present ? `${snapshot.card.type} · ${snapshot.card.identifier}` : "未检测到"} />}
     {(picoInformationAvailable || keyboardInputOnly) && <InfoRow label="供电线" value={keyboardInputOnly ? "—" : "未提供遥测"} />}
     {(picoInformationAvailable || keyboardInputOnly) && <InfoRow label="当前模式" value={keyboardInputOnly ? "—" : currentMode} accent />}
   </div>;
 }
 
-function InfoRow({ label, value, success, accent }: { label: string; value: ReactNode; success?: boolean; accent?: boolean }): ReactElement { return <div className="info-row"><span>{label}</span><b className={success ? "success" : accent ? "accent" : ""}>{value}</b></div>; }
+function InfoRow({ label, value, success, accent, className = "" }: { label: string; value: ReactNode; success?: boolean; accent?: boolean; className?: string }): ReactElement { return <div className={`info-row ${className}`}><span>{label}</span><b className={success ? "success" : accent ? "accent" : ""}>{value}</b></div>; }
 
 type HallFieldKey = "abcTravel" | "abcRtTrigger" | "abcRtRelease" | "abcDead" | "sideTravel" | "sideRtTrigger" | "sideRtRelease" | "sideDead";
 const hallTravelMm = 3.5;
@@ -795,6 +883,9 @@ function ControllerAccordionsV2({ snapshot, command, disabled = false, keyboardI
   // drag can update the local draft and collapse into the newest command.
   const leverSettingsUiWritable = deviceConfigFresh && isDeviceConfigUiAvailable(snapshot) && snapshot.capabilities.leverConfiguration;
   const leverCalibrationAvailable = isConfigurationUiWritable(snapshot) && snapshot.capabilities.leverCalibration;
+  const inputOnly = !snapshot.capabilities.basicLighting && !snapshot.capabilities.picoLighting &&
+    !snapshot.capabilities.hallConfiguration && !snapshot.capabilities.hallCalibration &&
+    !snapshot.capabilities.leverConfiguration && !snapshot.capabilities.leverCalibration;
   const lightingRef = useRef(lighting);
   useEffect(() => () => {
     if (leverTimer.current !== null) window.clearTimeout(leverTimer.current);
@@ -1039,6 +1130,7 @@ function ControllerAccordionsV2({ snapshot, command, disabled = false, keyboardI
   };
   const setCabPreset = (value: number) => applyLighting({ ...lightingRef.current, cabPreset: value });
   const toggleCabGameMapping = () => applyLighting({ ...lightingRef.current, cabGameMapping: !lightingRef.current.cabGameMapping });
+  if (inputOnly) return <div className="controller-accordions"><section className="controller-accordion input-only-accordion"><div className="accordion-heading"><h3>设备功能</h3><span>ⓘ</span></div><div className="joystick-unavailable">当前控制器未提供灯光、磁轴或摇杆设置。可用的输入状态会显示在上方。</div></section></div>;
   return <div className={`controller-accordions ${disabled ? "is-keyboard-disabled" : ""}`} aria-disabled={disabled || undefined}>
     <fieldset className="controller-configuration-fieldset" disabled={disabled}>
     <section className="controller-accordion lighting-accordion">

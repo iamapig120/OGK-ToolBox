@@ -104,6 +104,8 @@ contextBridge.exposeInMainWorld("ogk", {
   controllerReleaseAll: () => ipcRenderer.invoke("controller:release-all"),
   controllerVirtualKey: (key: string, pressed: boolean) => ipcRenderer.invoke("controller:virtual-key", key, pressed),
   controllerSetMode: (keyboardMouse: boolean) => ipcRenderer.invoke("controller:mode", keyboardMouse),
+  controllerSetInputMode: (modeId: string) => ipcRenderer.invoke("controller:input-mode", modeId),
+  controllerSelectBackend: (backendId: string) => ipcRenderer.invoke("controller:select-backend", backendId),
   controllerSetBrightness: (brightness: number) => ipcRenderer.invoke("controller:brightness", brightness),
   controllerSetCustomColor: (red: number, green: number, blue: number) => ipcRenderer.invoke("controller:custom-color", red, green, blue),
   controllerSetPicoLighting: (request: unknown) => ipcRenderer.invoke("controller:pico-lighting", request),

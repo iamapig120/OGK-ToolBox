@@ -36,5 +36,11 @@ jobs:
         shell: pwsh
       - run: npm run publish:api
         working-directory: src/OGKToolBox.Electron
-      - run: npx electron-builder --win dir
+      - run: npx electron-builder --win dir --publish never
+        working-directory: src/OGKToolBox.Electron
+      - name: Verify packaged controller provider
+        shell: pwsh
+        run: |
+          $env:OGK_CONTROLLER_PACKAGED_DIR = (Resolve-Path '../../artifacts/electron/win-unpacked').Path
+          node tests/controller-packaged.cjs
         working-directory: src/OGKToolBox.Electron
