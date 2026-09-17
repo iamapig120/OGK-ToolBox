@@ -80,7 +80,7 @@ public sealed class ConfigurationApplicationService(
             ("vfs", "amfs") or ("vfs", "option") or ("vfs", "appdata") or
             ("aime", "portNo") or ("aime", "scan") or
             ("dns", "replaceHost") or
-            ("io4", "keyboard") or
+            ("io4", "enable") or ("io4", "keyboard") or
             ("led", "serialPort");
 
     public async Task<ConfigurationPreviewTicket> PreviewAsync(string installationId, GameConfigurationFileKind kind,

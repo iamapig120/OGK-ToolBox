@@ -1067,7 +1067,8 @@ function createWindow(): void {
     icon: path.join(__dirname, app.isPackaged ? "../../dist/toolbox-icon.png" : "../../public/toolbox-icon.png"),
     // Chromium's renderer sandbox cannot initialize in some Windows desktop environments.
     // Keep the preload boundary and disable Node integration while allowing the renderer to start.
-    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false, sandbox: false }
+    // Keep the chart's animation and playback clock updating when this window is covered or minimized.
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false, sandbox: false, backgroundThrottling: false }
   });
   const window = mainWindow;
   window.once("ready-to-show", () => window.show());

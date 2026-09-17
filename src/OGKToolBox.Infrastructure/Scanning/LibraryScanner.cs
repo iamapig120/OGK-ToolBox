@@ -28,11 +28,13 @@ public sealed class LibraryScanner(
         var packages = await packageResolver.DiscoverAsync(installation, cancellationToken);
         var optionPackages = packages.Where(package => !package.IsBaseGame).ToArray();
         var resourceVariants = cached.Resources
-            .Where(resource => resource.Origin.PackageId.Equals("A000", StringComparison.OrdinalIgnoreCase))
+            .Where(resource => resource.Origin.PackageId.Equals("A000", StringComparison.OrdinalIgnoreCase)
+                && !IsUnityMetadata(resource.BundlePath))
             .Select(resource => resource with { Origin = resource.Origin with { IsEffective = false } })
             .ToList();
         var diagnostics = new ConcurrentBag<LibraryDiagnostic>(cached.Diagnostics.Where(diagnostic =>
-            diagnostic.SourcePath is null || !IsInsideOption(installation, diagnostic.SourcePath)));
+            diagnostic.SourcePath is null || (!IsInsideOption(installation, diagnostic.SourcePath)
+                && !IsUnityMetadata(diagnostic.SourcePath))));
         progress?.Report(new("更新 Option 资源", 0, Math.Max(optionPackages.Length, 1)));
 
         for (var indexValue = 0; indexValue < optionPackages.Length; indexValue++)
@@ -45,6 +47,7 @@ public sealed class LibraryScanner(
                 foreach (var path in Directory.EnumerateFiles(assetRoot, "*", SearchOption.AllDirectories))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    if (IsUnityMetadata(path)) continue;
                     var name = Path.GetFileName(path);
                     var kind = Classify(name);
                     var isUnityBundle = LooksLikeUnityBundle(path);
@@ -155,6 +158,7 @@ public sealed class LibraryScanner(
                 foreach (var path in Directory.EnumerateFiles(assetRoot, "*", SearchOption.AllDirectories))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    if (IsUnityMetadata(path)) continue;
                     resourceFiles.Add((path, package));
                     preparationReporter.Report("建立资源文件清单", resourceFiles.Count, 0, path, 0);
                 }
@@ -342,6 +346,9 @@ public sealed class LibraryScanner(
         yield return Path.Combine(package.RootPath, "musicsource");
         yield return Path.Combine(package.RootPath, "movie");
     }
+
+    private static bool IsUnityMetadata(string path) =>
+        Path.GetExtension(path).Equals(".meta", StringComparison.OrdinalIgnoreCase);
 
     private static bool LooksLikeUnityBundle(string path)
     {

@@ -22,7 +22,7 @@ async function session(adapter, fastDeadline = false) {
   await new Promise(resolve => reservation.close(resolve));
   const token = randomBytes(32).toString('hex');
   const argv = ['--port', String(port), '--session-token', token, '--instance-id', 'sdk-regression',
-    '--parent-pid', String(process.pid), '--software-version', '1.1.7'];
+    '--parent-pid', String(process.pid), '--software-version', require('../package.json').version];
   const provider = await sdk(fastDeadline).startProvider(adapter, argv);
   const call = (command, value = {}) => fetch(`http://127.0.0.1:${port}/api/v1/commands/${command}`, {
     method: 'POST', headers: { 'X-OGK-Controller-Session': token }, body: JSON.stringify(value)
@@ -140,7 +140,7 @@ test('a failed HTTP bind closes an already started adapter', async () => {
   try {
     await assert.rejects(sdk().startProvider({ ...example, close: () => { closed++; }, releaseAll: () => { released++; } },
       ['--port', String(occupied.address().port), '--session-token', 't'.repeat(32), '--instance-id', 'occupied',
-        '--parent-pid', String(process.pid), '--software-version', '1.1.7']));
+        '--parent-pid', String(process.pid), '--software-version', require('../package.json').version]));
     assert.equal(closed, 1);
     assert.equal(released, 1);
   } finally { await new Promise(resolve => occupied.close(resolve)); }

@@ -78,7 +78,7 @@ const segaDisplayGroups=[
 const segaFieldOrder:Record<string,readonly string[]>={
  vfs:["amfs","option","appdata"],dns:["default","AimeDB","replaceHost"],netenv:["enable"],keychip:["id","subnet"],
  aimeio:["path"],mu3io:["path"],aime:["enable","aimePath","aimeGen","felicaPath","portNo","scan"],
- io4:["mouse","keyboard","test","service","coin","xinput","left1","left2","left3","leftSide","rightSide","right1","right2","right3","leftMenu","rightMenu"],
+ io4:["enable","mouse","keyboard","test","service","coin","xinput","left1","left2","left3","leftSide","rightSide","right1","right2","right3","leftMenu","rightMenu"],
  led15093:["enable"],led:["cabLedOutputPipe","cabLedOutputSerial","controllerLedOutputPipe","controllerLedOutputSerial","serialPort","serialBaud"],
  system:["enable","freeplay","dipsw1"],gfx:["enable"],unity:["enable","targetAssembly"]
 };
@@ -114,6 +114,7 @@ function configPresentation(entry:any){
   "gfx.enable":{title:"启用图形 Hook",detail:"启用图形 Hook。"},"unity.enable":{title:"启用 Unity Hook",detail:"启用 Unity Hook，使游戏启动前可以运行自定义 .NET 代码。"},"unity.targetAssembly":{title:"启动前加载的 .NET DLL",detail:"游戏启动前运行指定的 .NET DLL，可用于加载 BepInEx 等 Mod 框架。"},
   "led15093.enable":{title:"启用 15093-06 灯光模拟"},"led.cabLedOutputPipe":{title:"框体灯 LED 输出通道",detail:"将框体灯 LED 灯带数据输出到名为 \\\\.\\pipe\\ongeki_led 的通道。"},"led.cabLedOutputSerial":{title:"框体灯 LED 串口输出",detail:"将框体灯 LED 灯带数据输出到串口。"},"led.controllerLedOutputPipe":{title:"控制器 LED 输出通道",detail:"将滑块 LED 数据输出到通道。"},"led.controllerLedOutputSerial":{title:"控制器 LED 串口输出",detail:"将滑块 LED 数据输出到串口。"},"led.serialPort":{title:"LED串口",detail:"使用串口输出时的数据发送端口，默认 COM5。"},"led.serialBaud":{title:"LED 串口波特率",detail:"串口数据传输速率。"},
   "aimeio.path":{title:"Aime IO",detail:"自定义读卡器 IO。"},"mu3io.path":{title:"MU3IO",detail:"自定义控制器的 DLL。"},
+  "io4.enable":{title:"接管io4",detail:"关闭以使用io4手台"},
   "io4.test":{title:"测试键",detail:"测试键的虚拟键码；默认 F1。"},"io4.service":{title:"服务键",detail:"服务键的虚拟键码；默认 F2。"},"io4.coin":{title:"投币键",detail:"增加投币计数的键盘键；默认 F3。"},"io4.mouse":{title:"用鼠标模拟摇杆",detail:"关闭时使用 XInput模拟摇杆"},"io4.xinput":{title:"XInput 输入"},"io4.keyboard":{title:"键盘输入"},
   "io4.left1":{title:"左红键"},"io4.left2":{title:"左绿键"},"io4.left3":{title:"左蓝键"},"io4.leftSide":{title:"左侧键"},"io4.rightSide":{title:"右侧键"},"io4.right1":{title:"右红键"},"io4.right2":{title:"右绿键"},"io4.right3":{title:"右蓝键"},"io4.leftMenu":{title:"左菜单键"},"io4.rightMenu":{title:"右菜单键"}
  };

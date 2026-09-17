@@ -5,7 +5,7 @@ const { once } = require('node:events');
 const load = require('./helpers/load-controller-module.cjs');
 const { emptyControllerSnapshot } = load('src/controller-state.ts');
 const { ControllerModuleManager } = load('electron/controller-module-manager.ts', {
-  electron: { app: { isPackaged: false, getVersion: () => '1.1.7' } }
+  electron: { app: { isPackaged: false, getVersion: () => require('../package.json').version } }
 });
 
 test('legacy mode metadata is adapted without sending a new endpoint to the old Host', async () => {

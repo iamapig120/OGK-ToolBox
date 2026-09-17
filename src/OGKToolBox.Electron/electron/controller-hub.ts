@@ -47,6 +47,7 @@ export class ControllerHub {
     return { ...current, selectedBackendId: this.activeId,
       backends: this.backends.map(backend => ({ id: backend.id,
         label: this.connected(backend) ? backend.getSnapshot()!.identity.displayName : backend.label,
+        kind: backend.getSnapshot()?.identity.kind,
         connected: this.connected(backend), selected: backend.id === this.activeId,
         state: backend.getStatus().state, error: backend.getStatus().error })) };
   }
@@ -179,6 +180,8 @@ export class ControllerHub {
   private changed(backend: ControllerBackend): void {
     const previous = this.connections.get(backend.id) ?? { online: false, version: 0 };
     const online = this.connected(backend);
+    // Keep a manual choice while it is connected, but let a lost selection fall back to an available device.
+    if (!this.stopping && backend.id === this.activeId && previous.online && !online) this.manualSelection = false;
     this.connections.set(backend.id, { online, version: previous.version + (online && !previous.online ? 1 : 0) });
     this.publish();
     if (this.reconcilePending || this.stopping) return;

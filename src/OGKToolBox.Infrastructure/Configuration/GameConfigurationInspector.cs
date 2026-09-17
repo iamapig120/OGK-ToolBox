@@ -369,6 +369,8 @@ public sealed class GameConfigurationInspector : IGameConfigurationInspector
         Add(GameConfigurationFileKind.SegaTools, "led15093", "enable", ConfigurationValueKind.Boolean, "启用 15093-06 灯光模拟");
         Add(GameConfigurationFileKind.SegaTools, "aimeio", "path", ConfigurationValueKind.Path, "自定义读卡器 IO DLL");
         Add(GameConfigurationFileKind.SegaTools, "mu3io", "path", ConfigurationValueKind.Path, "MU3IO 路径");
+        Add(GameConfigurationFileKind.SegaTools, "io4", "enable", ConfigurationValueKind.Boolean,
+            "接管io4", defaultValue: "1", addable: true);
         foreach (var key in new[] { "test", "service", "coin", "mouse", "xinput", "keyboard", "left1", "left2", "left3", "leftSide", "rightSide", "right1", "right2", "right3", "leftMenu", "rightMenu" })
             Add(GameConfigurationFileKind.SegaTools, "io4", key,
                 key is "mouse" or "xinput" or "keyboard" ? ConfigurationValueKind.Boolean : ConfigurationValueKind.Text,

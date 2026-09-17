@@ -13,7 +13,10 @@ uses typed IPC and does not receive the API session token. Game data stays in th
 The renderer uses one controller snapshot and command interface. `electron/controller-registry.ts`
 registers the available backends; `electron/controller-hub.ts` chooses which one supplies that snapshot
 and receives ordinary commands.
-An online selection is retained when another device appears, and users can select a backend in the UI.
+An online selection is retained when another device appears. When multiple backends report connected
+devices, the controller page shows their names as clickable tags at the top right; one device is shown
+as a static name. Disconnected backends are omitted. If the active device disconnects, selection can
+fall back to another connected backend, including after a previous manual choice.
 Release and shutdown handling also covers inactive providers that may still own input resources.
 Before changing backends, the previous running provider must confirm `release-all` with `Verified`.
 If release fails or times out, the current selection is retained.
@@ -56,4 +59,4 @@ its driver, the SDK runtime and required HID dependency files accessible outside
 This layout must also be checked in the packaged application, not just in a development checkout.
 
 An application update replaces the installed application components together. User indexes, caches and
-backups in game directories remain separate. Runtime code does not fetch or compile private sources.
+backups in game directories remain separate. Runtime code does not fetch or compile controller sources.

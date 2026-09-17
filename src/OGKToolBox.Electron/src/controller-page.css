@@ -101,6 +101,9 @@
 .controller-page-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: 8px;
 }
 .controller-supported-devices {
@@ -779,17 +782,18 @@
 .controller-input-modes button { flex: 1 0 auto; max-width: 100%; white-space: normal; overflow-wrap: anywhere; height: auto; }
 .info-row.controller-mode-row { height: auto; flex-wrap: wrap; gap: 8px; padding-top: 5px; padding-bottom: 5px; }
 .controller-mode-row > b { flex: 1; justify-content: flex-end; }
-.controller-device-choice { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 16px; }
-.controller-device-choice > span { color: #657386; font-size: 13px; }
-.controller-device-selector { min-width: 0; height: auto; max-width: 100%; flex-wrap: wrap; }
-.controller-device-selector button { display: flex; flex: 0 1 auto; min-width: 96px; max-width: 260px; align-items: center; justify-content: center; gap: 8px; height: auto; white-space: normal; overflow-wrap: anywhere; }
-.controller-device-selector small { font-size: 12px; font-weight: 400; }
-.controller-device-choice > .controller-prompt-error { flex-basis: 100%; margin: 0; }
+.controller-device-choice { display: flex; min-width: 0; max-width: 100%; flex-direction: column; align-items: flex-end; gap: 5px; }
+.controller-supported-devices.is-offline { height: auto; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; }
+.controller-device-selector { min-width: 0; height: auto; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; }
+.controller-device-label { display: block; min-width: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.controller-device-selector button { cursor: pointer; }
+.controller-device-selector button:hover:not(:disabled):not(.is-connected) { border-color: #a8b5c5; background: #edf1f6; }
+.controller-device-selector button:disabled { cursor: wait; opacity: .65; }
+.controller-device-choice > .controller-prompt-error { max-width: 360px; margin: 0; font-size: 12px; text-align: right; overflow-wrap: anywhere; }
 .controller-input-modes button:focus-visible,
 .controller-device-selector button:focus-visible { outline: 2px solid #d94c1b; outline-offset: 2px; }
 .controller-page .controller-key:disabled,
 .controller-page .monitor-action:disabled { opacity: 1; cursor: default; }
-.dark .controller-device-choice > span { color: #9eabb9; }
 
 .magnetic-content { gap: 10px; padding: 0; }
 .magnetic-content-header b { font-size: 20px; line-height: 26px; }
@@ -1075,7 +1079,7 @@
 .workspace:has(.controller-page.is-connected),
 .preview-frame .workspace:has(.controller-page.is-connected) { padding-top: 8px; padding-bottom: 8px; }
 .controller-page.is-connected { gap: 10px; }
-.controller-page.is-connected .controller-page-header { height: 60px; min-height: 60px; }
+.controller-page.is-connected .controller-page-header { height: auto; min-height: 60px; }
 .controller-page.is-connected .controller-page-header h1 { font-size: 27px; line-height: 33px; }
 .controller-monitor-surface { height: 582px; min-height: 582px; }
 .controller-accordions,
@@ -1292,6 +1296,7 @@
   color: #ffb092;
   box-shadow: 0 0 0 1px #b9573233;
 }
+.dark .controller-device-selector button:hover:not(:disabled):not(.is-connected) { border-color: #596a7e; background: #344354; }
 .dark .controller-refresh,
 .dark .disconnected-actions button,
 .dark .magnetic-actions button,

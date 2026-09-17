@@ -166,8 +166,10 @@ function Home({summary,config,message,busy,onScan,onChanged}:{summary:Summary;co
   const segatoolsReady = hasRoot && !!config && !segatoolsError;
   const healthyCount = [hasRoot, hasIndex, hasVersion, diagnosticsReady, segatoolsReady].filter(Boolean).length;
   const healthHealthy = healthyCount === 5 && controllerStatus.online;
-  const controllerHealthText = controllerStatus.online ? controllerStatus.note : controllerStatus.text === "正在检测" || controllerStatus.text === "模块重启中" ? "正在检测兼容控制器" : "控制器尚未连接";
-  const controllerHealthBadge = summary.diagnosticCount ? `${summary.diagnosticCount} 项需处理` : controllerStatus.online ? "设备在线" : controllerHealthText === "正在检测兼容控制器" ? "检测中" : "设备离线";
+  const controllerHealthText = controllerStatus.note;
+  const controllerHealthBadge = summary.diagnosticCount ? `${summary.diagnosticCount} 项需处理` : controllerStatus.online ? "设备在线"
+    : controllerStatus.detected ? controllerStatus.text : controllerModuleStatus.state === "starting" || controllerModuleStatus.state === "restarting" ? "检测中"
+    : controllerModuleStatus.state === "fault" ? "模块故障" : "设备离线";
   const commitResolution = (): LaunchOptions => {
     const normalize = (value: string, fallback: number) => value.trim() && Number.isFinite(Number(value))
       ? Math.max(320, Math.min(8192, Math.round(Number(value)))) : fallback;

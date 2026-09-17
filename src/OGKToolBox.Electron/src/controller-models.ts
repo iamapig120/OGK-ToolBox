@@ -10,6 +10,7 @@ export type ControllerInputModes = { current: string; options: { id: string; lab
 export type ControllerBackendState = "starting" | "ready" | "fault" | "restarting" | "stopped";
 export type ControllerBackendView = {
   id: string; label: string; connected: boolean; selected: boolean;
+  kind?: ControllerKind;
   state: ControllerBackendState; error?: string;
 };
 

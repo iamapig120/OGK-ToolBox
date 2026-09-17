@@ -31,7 +31,7 @@ if (require.main === module) {
     const root = path.resolve(__dirname, '..');
     const { version } = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     verifyController(path.join(root, 'resources/controller'), version);
-    console.log(`Verified prebuilt controller ${version} (win-x64); no private source is required.`);
+    console.log(`Verified prebuilt controller ${version} (win-x64).`);
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

@@ -28,7 +28,7 @@ async function waitUntil(predicate, timeout = 6000) {
   assert.equal((await once(binding, 'exit'))[0], 0);
 
   const { ControllerModuleManager } = load('electron/controller-module-manager.ts', {
-    electron: { app: { isPackaged: false, getVersion: () => '1.1.7' } }
+    electron: { app: { isPackaged: false, getVersion: () => require('../package.json').version } }
   });
   const manager = new ControllerModuleManager({ id: 'io4', label: 'IO4 test',
     resolveTarget: async () => ({ directory, executable, node: true,
@@ -45,6 +45,30 @@ async function waitUntil(predicate, timeout = 6000) {
     console.log('PASS: packaged provider handshake, snapshots, commands, isolated crash and restart (HID mocked)');
   } finally { await manager.stop(); }
   assert.equal(manager.getStatus().state, 'stopped'); assert.equal(manager.child, undefined);
+
+  const { resolveControllerProvider } = load('electron/controller-provider.ts');
+  const simulation = new ControllerModuleManager({ id: 'external', label: 'Simulation test',
+    resolveTarget: () => resolveControllerProvider(path.join(directory, 'resources/controller'), require('../package.json').version,
+      path.resolve(__dirname, '../../../examples/simgeki-provider'), executable) });
+  let frames = 0;
+  const unsubscribe = simulation.onSnapshot(() => { frames++; });
+  try {
+    await simulation.start();
+    await waitUntil(() => simulation.getStatus().state === 'ready');
+    assert.equal(simulation.getSnapshot().identity.displayName, 'SimGEKI（模拟）');
+    assert.equal(simulation.getSnapshot().capabilities.virtualKeys, false);
+    const lever = simulation.getSnapshot().input.mappedLever;
+    await waitUntil(() => frames >= 3 && simulation.getSnapshot().input.mappedLever !== lever);
+    for (const modeId of ['2', '3', '1']) {
+      const response = await simulation.setInputMode(modeId);
+      assert.equal(response.status, 'Verified');
+      assert.equal(response.snapshot.inputModes.current, modeId);
+    }
+    assert.equal((await simulation.setBrightness(100)).status, 'Rejected');
+    await simulation.releaseAllIfRunning();
+    console.log('PASS: external SimGEKI simulation loads in packaged Electron, streams input and verifies all three in-memory modes');
+  } finally { unsubscribe(); await simulation.stop(); }
+  assert.equal(simulation.getStatus().state, 'stopped'); assert.equal(simulation.child, undefined);
   const originalHost = path.resolve(__dirname, '../resources/controller/OGKToolBox.ControllerHost.exe');
   const packagedHost = path.join(directory, 'resources/controller/OGKToolBox.ControllerHost.exe');
   const hash = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');

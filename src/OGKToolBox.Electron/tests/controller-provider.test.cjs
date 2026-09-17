@@ -25,14 +25,14 @@ const resolver = load('controller-provider');
 
 test('provider selection defaults to unchanged bundled binary and accepts independent example', async () => {
   const bundled = path.resolve(__dirname, '../resources/controller');
-  const builtin = await resolver.resolveControllerProvider(bundled, '1.1.7', undefined, process.execPath);
+  const builtin = await resolver.resolveControllerProvider(bundled, require('../package.json').version, undefined, process.execPath);
   assert.equal(builtin.manifest.moduleId, 'ogk-controller');
   assert.equal(builtin.node, false);
-  const other = await resolver.resolveControllerProvider(bundled, '1.1.7', example, process.execPath);
+  const other = await resolver.resolveControllerProvider(bundled, require('../package.json').version, example, process.execPath);
   assert.equal(other.manifest.moduleId, 'example-controller');
   assert.equal(other.executable, process.execPath);
   assert.equal(other.prefixArgs[0], path.join(example, 'provider.cjs'));
-  await assert.rejects(resolver.resolveControllerProvider(bundled, '1.1.7', '../relative', process.execPath), /absolute/);
+  await assert.rejects(resolver.resolveControllerProvider(bundled, require('../package.json').version, '../relative', process.execPath), /absolute/);
   await assert.rejects(resolver.resolveControllerProvider(bundled, '9.0.0', example, process.execPath), /incompatible/);
 });
 
@@ -46,15 +46,15 @@ test('rejects path traversal and unknown runtimes before launch', async t => {
   const manifest = JSON.parse(fs.readFileSync(path.join(example, 'module.json')));
   for (const entryPoint of ['../provider.cjs', 'C:\\provider.cjs', 'provider.cjs --flag']) {
     fs.writeFileSync(path.join(directory, 'module.json'), JSON.stringify({ ...manifest, entryPoint }));
-    await assert.rejects(resolver.resolveControllerProvider('', '1.1.7', directory, process.execPath), /entryPoint/);
+    await assert.rejects(resolver.resolveControllerProvider('', require('../package.json').version, directory, process.execPath), /entryPoint/);
   }
   fs.writeFileSync(path.join(directory, 'module.json'), JSON.stringify({ ...manifest, runtime: 'shell' }));
-  await assert.rejects(resolver.resolveControllerProvider('', '1.1.7', directory, process.execPath), /runtime/);
+  await assert.rejects(resolver.resolveControllerProvider('', require('../package.json').version, directory, process.execPath), /runtime/);
 });
 
 test('actual manager starts third-party provider, receives input, rejects unsupported writes and stops', { timeout: 15000 }, async t => {
   const { ControllerModuleManager } = load('controller-module-manager', {
-    electron: { app: { isPackaged: false, getVersion: () => '1.1.7' } }, './controller-provider': resolver,
+    electron: { app: { isPackaged: false, getVersion: () => require('../package.json').version } }, './controller-provider': resolver,
     '../src/controller-state': load('../src/controller-state')
   }, { process: { ...process, execPath: require('electron'), env: { ...process.env, OGK_CONTROLLER_MODULE_DIR: example } } });
   const manager = new ControllerModuleManager();
@@ -74,7 +74,7 @@ test('provider rejects missing tokens and browser origins, streams snapshots and
   const port = reservation.address().port; await new Promise(resolve => reservation.close(resolve));
   const token = randomBytes(32).toString('hex');
   const child = spawn(process.execPath, [path.join(example, 'provider.cjs'), '--port', String(port),
-    '--session-token', token, '--instance-id', 'test-instance', '--parent-pid', String(process.pid), '--software-version', '1.1.7'], { windowsHide: true });
+    '--session-token', token, '--instance-id', 'test-instance', '--parent-pid', String(process.pid), '--software-version', require('../package.json').version], { windowsHide: true });
   t.after(() => { if (child.exitCode === null) child.kill(); });
   await new Promise((resolve, reject) => {
     let output = ''; const timer = setTimeout(() => reject(new Error('Provider startup timeout')), 5000);

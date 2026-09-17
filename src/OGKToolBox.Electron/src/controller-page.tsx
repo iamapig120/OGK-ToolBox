@@ -96,19 +96,33 @@ const isDeviceConfigUiAvailable = (snapshot: ControllerSnapshot) => snapshot.ide
   snapshot.state !== "Disabled" && snapshot.state !== "Searching" && snapshot.state !== "ConnectedWaitingForData" &&
   snapshot.state !== "CalibratingHall" && snapshot.state !== "CalibratingLever" && snapshot.state !== "SyncFailed" &&
   snapshot.state !== "Faulted" && snapshot.state !== "Unsupported" && snapshot.state !== "BootloaderPending";
-const controllerDisplayName = (snapshot: ControllerSnapshot) => snapshot.identity.kind === "Pico" ? "LUXIS" : snapshot.identity.displayName;
+const controllerDisplayName = (snapshot: { identity: Pick<ControllerSnapshot["identity"], "kind" | "displayName"> }) => snapshot.identity.kind === "Pico" ? "LUXIS" : snapshot.identity.displayName;
 export const controllerStatusView = (snapshot: ControllerSnapshot, moduleStatus: ControllerModuleStatus) => {
   // A known VID/PID alone is not enough for a green status. The input stream
   // and configuration readback must both be valid before Home reports the
   // device as online.
   const online = moduleStatus.state === "ready" && isOnline(snapshot) && isInputReady(snapshot);
-  const text = moduleStatus.state === "fault" ? "模块故障" : moduleStatus.state === "restarting" ? "模块重启中" : moduleStatus.state === "starting" ? "正在检测" : moduleStatus.state === "stopped" ? "服务已停止" : stateLabel[snapshot.state];
-  const syncing = snapshot.identity.kind !== "Unknown" && (snapshot.state === "Searching" || snapshot.state === "ConnectedWaitingForData" || snapshot.state === "SyncingDevice" || snapshot.state === "SyncingHall");
-  const note = online ? `${controllerDisplayName(snapshot)} · 输入监视已连接` : moduleStatus.error || snapshot.error ||
-    (moduleStatus.state === "starting" || moduleStatus.state === "restarting" ? "正在检测兼容的 HID 设备" :
-      snapshot.state === "ConnectedWaitingForData" ? "已发现控制器，等待首帧输入数据" :
-      syncing ? "正在读取控制器配置" : "未检测到兼容的 HID 设备");
-  return { online, text, note };
+  const detected = moduleStatus.state === "ready" && snapshot.identity.kind !== "Unknown"
+    && snapshot.state !== "Disabled" && snapshot.state !== "Searching" && snapshot.state !== "BootloaderPending";
+  const text = moduleStatus.state === "fault" ? "模块故障" : moduleStatus.state === "restarting" ? "模块重启中" : moduleStatus.state === "starting" ? "正在检测" : moduleStatus.state === "stopped" ? "服务已停止"
+    : detected && snapshot.state === "Ready" && !online ? !snapshot.readbackComplete ? "等待设备状态" : "设备已连接"
+    : stateLabel[snapshot.state];
+  const name = controllerDisplayName(snapshot);
+  const readOnly = !snapshot.canWrite ? "（只读）" : "";
+  const note = moduleStatus.error || snapshot.error ||
+    (moduleStatus.state === "fault" ? "控制器服务发生故障，请重启服务" :
+      moduleStatus.state === "stopped" || snapshot.state === "Disabled" ? "控制器服务已停止" :
+      moduleStatus.state === "starting" || moduleStatus.state === "restarting" ? "正在检测兼容的 HID 设备" :
+      snapshot.state === "BootloaderPending" ? "设备正在重新枚举，请稍候" :
+      snapshot.state === "Faulted" ? "控制器发生故障，请重新连接后重试" :
+      snapshot.state === "Unsupported" ? "已检测到控制器，当前协议不受支持" :
+      snapshot.state === "SyncFailed" ? `${name} · 配置同步失败，请重新同步` :
+      snapshot.state === "ConnectedWaitingForData" ? `${name} · 等待首帧输入数据` :
+      snapshot.state === "SyncingDevice" || snapshot.state === "SyncingHall" ? `${name} · 正在读取控制器配置` :
+      online ? `${name} · 输入监视已连接${readOnly}` :
+      detected && !snapshot.readbackComplete ? `${name} · 已识别设备，等待状态回读${readOnly}` :
+      detected ? `${name} · 已连接，未提供输入监视${readOnly}` : "未检测到兼容的 HID 设备");
+  return { online, detected, text, note };
 };
 const leverPercent = (value: number) => Math.max(0, Math.min(100, (value / 1023) * 100));
 const hexColor = (rgb: readonly number[]) => `#${rgb.slice(0, 3).map(value => Math.max(0, Math.min(255, Math.round(Number(value) || 0))).toString(16).padStart(2, "0")).join("").toUpperCase()}`;
@@ -226,7 +240,7 @@ function ControllerSkeleton(): ReactElement {
 export function ControllerStatusCard(): ReactElement {
   const { snapshot, moduleStatus } = useController();
   const { online, text, note } = controllerStatusView(snapshot, moduleStatus);
-  return <article className={`surface status controller-status-card ${online ? "is-online" : "muted"}`}><span className="status-leading"><PencilGamepadIcon /></span><div><small>控制器</small><b>{text}</b><span>{note}</span></div><span className={`status-result ${online ? "ok" : ""}`} aria-label={online ? "已连接" : "未连接"}>{online ? <PencilCheckIcon /> : <PencilCloseIcon />}</span></article>;
+  return <article className={`surface status controller-status-card ${online ? "is-online" : "muted"}`}><span className="status-leading"><PencilGamepadIcon /></span><div><small>控制器</small><b>{text}</b><span>{note}</span></div><span className={`status-result ${online ? "ok" : ""}`} aria-label={online ? "已连接" : text}>{online ? <PencilCheckIcon /> : <PencilCloseIcon />}</span></article>;
 }
 
 export function ControllerPage(props: ControllerPageProps): ReactElement {
@@ -608,9 +622,8 @@ function ControllerWorkspace({ gameRoot = "", onConfigurationChanged, controller
   return <div className={`controller-page ${connected ? "is-connected" : "is-disconnected"} ${keyboardOnly ? "is-keyboard-input" : ""} ${configurationReadbackPending ? "is-config-readback" : ""}`}>
      <div className="controller-page-header">
        <div><h1 key={connected ? "connected" : keyboardOnly ? "keyboard-input" : "disconnected"}>控制器</h1><p>{connected ? "Signal-first tuning console · 1440 × 900" : keyboardOnly ? "已启用 Segatools 键盘输入 · 未连接硬件控制器" : "未检测到兼容控制器 · 请连接设备后重新扫描"}</p></div>
-       <div className="controller-page-actions"><span className="controller-supported-devices">{!connected && <span>已支持设备：</span>}{(["NYAGEKI", "LUXIS", "SimGEKI", "IO4"] as const).map(name => (!connected || connectedDeviceName === name) && <b key={name} className={`controller-supported-device ${connectedDeviceName === name && connected ? "is-connected" : ""}`}>{name}</b>)}</span>{connected ? <button type="button" className="controller-refresh" disabled={refreshing} onClick={rescan}>刷新设备</button> : <span className={`connection-chip ${keyboardOnly ? "is-keyboard-input" : ""}`}><i />{keyboardOnly ? "键盘输入" : "未连接"}</span>}</div>
+       <div className="controller-page-actions"><ControllerDeviceSelector status={moduleStatus} command={command} />{connected ? <button type="button" className="controller-refresh" disabled={refreshing} onClick={rescan}>刷新设备</button> : <span className={`connection-chip ${keyboardOnly ? "is-keyboard-input" : ""}`}><i />{keyboardOnly ? "键盘输入" : "未连接"}</span>}</div>
      </div>
-     <ControllerDeviceSelector status={moduleStatus} command={command} />
      {keyboardInputNotice && <div className="controller-config-toast" role="status" aria-live="polite">{keyboardInputNotice}</div>}
      {connected || keyboardOnly ? <>
        <div className={`controller-transition-shell ${transitionLoading ? "is-loading" : "is-ready"}`} aria-busy={transitionLoading}>
@@ -630,20 +643,42 @@ export function ControllerDeviceSelector({ status, command }: {
 }): ReactElement | null {
   const [selecting, setSelecting] = useState(false);
   const [error, setError] = useState("");
-  if (!status.backends || status.backends.length < 2) return null;
-  const select = async (backendId: string) => {
+  const selectionPending = useRef(false);
+  const devices = status.backends?.filter(backend => backend.connected).map(backend => ({ ...backend,
+    displayLabel: controllerDisplayName({ identity: { kind: backend.kind ?? "Unknown", displayName: backend.label } })
+  })) ?? [];
+  if (!devices.length) return <span className="controller-supported-devices is-offline">
+    <span>已支持设备：</span>
+    {["NYAGEKI", "LUXIS", "SimGEKI", "IO4"].map(label => <b key={label} className="controller-supported-device">{label}</b>)}
+  </span>;
+  if (devices.length === 1) return <span className="controller-supported-devices">
+    <b className="controller-supported-device is-connected" title={devices[0].displayLabel}>
+      <span className="controller-device-label">{devices[0].displayLabel}</span>
+    </b>
+  </span>;
+  const select = async (backendId: string, fromKeyboard: boolean) => {
+    if (selecting || selectionPending.current) return;
+    selectionPending.current = true;
     setSelecting(true); setError("");
-    const result = await command(() => window.ogk.controllerSelectBackend(backendId), { allowConnectionChange: true });
-    if (result?.status === "Failed" || result?.status === "Rejected") setError(result.message);
-    setSelecting(false);
+    try {
+      const result = await command(() => window.ogk.controllerSelectBackend(backendId), { allowConnectionChange: true });
+      if (!result) setError("设备切换未完成，请重试。");
+      else if (result.status === "Failed" || result.status === "Rejected") setError(result.message || "设备切换失败，请重试。");
+      else if (fromKeyboard) window.requestAnimationFrame(() => {
+        // Switching connections remounts the workspace; keep keyboard focus on its selected tag.
+        const selected = Array.from(document.querySelectorAll<HTMLButtonElement>(".controller-device-selector button"))
+          .find(button => button.dataset.backendId === backendId && button.getAttribute("aria-pressed") === "true");
+        selected?.focus({ preventScroll: true });
+      });
+    } catch (error) { setError(error instanceof Error ? error.message : String(error)); }
+    finally { selectionPending.current = false; setSelecting(false); }
   };
   return <div className="controller-device-choice">
-    <span>当前设备</span>
-    <div className="input-mode-segmented controller-device-selector" role="group" aria-label="选择控制器" aria-busy={selecting}>
-      {status.backends.map(backend => <button type="button" key={backend.id}
-        className={backend.selected ? "selected" : ""} aria-pressed={backend.selected}
-        disabled={selecting} onClick={() => { if (!backend.selected) void select(backend.id); }}>
-        <span>{backend.label}</span>{!backend.connected && <small>{backend.state === "fault" ? "不可用" : "未连接"}</small>}
+    <div className="controller-supported-devices controller-device-selector" role="group" aria-label="切换控制器" aria-busy={selecting}>
+      {devices.map(backend => <button type="button" key={backend.id} title={backend.displayLabel} data-backend-id={backend.id}
+        className={`controller-supported-device${backend.selected ? " is-connected" : ""}`} aria-pressed={backend.selected}
+        disabled={selecting} onClick={event => { if (!backend.selected) void select(backend.id, event?.detail === 0); }}>
+        <span className="controller-device-label">{backend.displayLabel}</span>
       </button>)}
     </div>
     {error && <p className="controller-prompt-error" role="alert">{error}</p>}

@@ -54,13 +54,78 @@ test('hotplug keeps the online device; explicit switching releases its held keys
   assert.equal(io4.commands.length, 0);
 });
 
-test('any registered connected backend can be discovered; a manual choice remains selected', async () => {
+test('an explicit offline choice remains selected until it connects and subsequently disconnects', async () => {
   const host = new Backend('builtin'), other = new Backend('third-party', 'FutureDevice');
   const hub = new ControllerHub([host, other]); await tick();
   assert.equal(hub.getStatus().selectedBackendId, 'third-party');
   await hub.selectBackend('builtin'); other.publish('FutureDevice'); await tick();
   assert.equal(hub.getStatus().selectedBackendId, 'builtin');
   assert.equal((await hub.selectBackend('missing')).status, 'Rejected');
+  host.publish('Leonardo'); other.publish('FutureDevice'); await tick();
+  assert.equal(hub.getStatus().selectedBackendId, 'builtin');
+  host.publish('Unknown'); await tick();
+  assert.equal(hub.getStatus().selectedBackendId, 'third-party');
+});
+
+test('a disconnected manual selection falls back only after its held keys are released', async () => {
+  const host = new Backend('builtin', 'Leonardo'), io4 = new Backend('io4', 'SimGEKI');
+  const hub = new ControllerHub([host, io4]);
+  await hub.selectBackend('io4');
+  await hub.setVirtualKey('L_A', true);
+  const entered = deferred(), release = deferred();
+  io4.releaseAllIfRunning = async () => { io4.releases++; entered.resolve(); await release.promise; io4.keys.clear(); };
+  io4.publish('Unknown');
+  await entered.promise;
+  assert.equal(hub.getStatus().selectedBackendId, 'io4');
+  assert.equal(io4.keys.has('L_A'), true);
+  release.resolve(); await tick();
+  assert.equal(hub.getStatus().selectedBackendId, 'builtin');
+  assert.equal(io4.releases, 1);
+  assert.equal(io4.keys.size, 0);
+  assert.equal(hub.heldKeys.size, 0);
+});
+
+test('new connections cannot take over a manually selected device while it remains connected', async () => {
+  const host = new Backend('builtin', 'Leonardo'), io4 = new Backend('io4', 'SimGEKI');
+  const other = new Backend('third-party');
+  const hub = new ControllerHub([host, io4, other]);
+  await hub.selectBackend('io4');
+  host.publish('Unknown'); other.publish('FutureDevice'); host.publish('Leonardo'); await tick();
+  assert.equal(hub.getStatus().selectedBackendId, 'io4');
+  assert.equal(io4.releases, 0);
+});
+
+test('a failed manual selection falls back even if its last snapshot still names a device', async () => {
+  const host = new Backend('builtin', 'Leonardo'), io4 = new Backend('io4', 'SimGEKI');
+  const hub = new ControllerHub([host, io4]);
+  await hub.selectBackend('io4');
+  io4.statusTo('fault', 'IO4 provider stopped'); await tick();
+  assert.equal(hub.getStatus().selectedBackendId, 'builtin');
+  assert.equal(hub.getSnapshot().identity.kind, 'Leonardo');
+  assert.equal(hub.getStatus().backends.find(backend => backend.id === 'io4').connected, false);
+});
+
+test('after the last manually selected device disconnects, the next available device is selected', async () => {
+  const host = new Backend('builtin'), io4 = new Backend('io4', 'SimGEKI');
+  const hub = new ControllerHub([host, io4]); await tick();
+  await hub.selectBackend('io4');
+  io4.publish('Unknown'); await tick();
+  assert.equal(hub.getStatus().selectedBackendId, 'io4');
+  assert.equal(hub.getStatus().backends.some(backend => backend.connected), false);
+  host.publish('Leonardo'); await tick();
+  assert.equal(hub.getStatus().selectedBackendId, 'builtin');
+});
+
+test('automatic fallback also retains held-key ownership if release verification fails', async () => {
+  const host = new Backend('builtin', 'Leonardo'), io4 = new Backend('io4', 'SimGEKI');
+  const hub = new ControllerHub([host, io4]);
+  await hub.selectBackend('io4');
+  await hub.setVirtualKey('L_A', true);
+  io4.releaseAllIfRunning = async () => { throw new Error('release was not verified'); };
+  io4.publish('Unknown'); await tick();
+  assert.equal(hub.getStatus().selectedBackendId, 'io4');
+  assert.equal(io4.keys.has('L_A'), true);
+  assert.equal(hub.heldKeys.get('L_A').backend, io4);
 });
 
 test('queued configuration and key presses cannot cross a reconnect of the same backend', async () => {

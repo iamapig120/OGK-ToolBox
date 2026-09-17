@@ -1,4 +1,4 @@
-# Create the public installer feed repository. Source stays in lynshp/OGKToolBox.
+# Create the installer feed repository.
 param(
     [string]$Owner = "lynshp",
     [string]$Name = "OGKToolBox-releases"
@@ -23,7 +23,7 @@ $view = & $gh repo view $repo --json url,visibility 2>$null
 if ($LASTEXITCODE -eq 0 -and $view) {
     Write-Host "Repository already exists: $repo"
 } else {
-    & $gh repo create $repo --public --description "Public installer releases for OGK ToolBox. Source stays private." --disable-issues --disable-wiki --homepage "https://github.com/$Owner/OGKToolBox"
+    & $gh repo create $repo --public --description "Windows installer releases for OGK ToolBox." --disable-issues --disable-wiki --homepage "https://github.com/$Owner/OGK-ToolBox"
     if ($LASTEXITCODE -ne 0) { throw "Failed to create $repo" }
 }
 
@@ -36,7 +36,7 @@ $readme = @"
 
 This public repository only hosts **compiled Windows installers** for 春菜的便当盒 (OGK ToolBox).
 
-- Source code stays in a private repository.
+- Source code: https://github.com/$Owner/OGK-ToolBox
 - Do not open pull requests that add source, game files, tokens, or user data.
 - Each Published release must include the NSIS installer, ``.blockmap``, and ``latest.yml``.
 - Draft releases are invisible to ``electron-updater``.

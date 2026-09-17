@@ -15,12 +15,19 @@ npm run dev
 ```
 
 示例显示只读的 `Example Controller (simulation)`，没有实际硬件访问、按键注入或配置写入。
+需要测试动态按键、摇杆和三种模式时，可使用 [SimGEKI 模拟提供者](../examples/simgeki-provider/README.md)。
+该示例只生成模拟状态，不能代替真实 SimGEKI 的 USB 协议或游戏输入测试。
 结束测试后用 `Remove-Item Env:OGK_CONTROLLER_MODULE_DIR` 清除当前终端的选择，重新启动应用即恢复默认模块。
 变量也适用于从该终端启动的、包含本次源码变更的安装版；先退出已有应用进程。
 已发布的旧版 v1.1.7 安装包尚不包含此扩展加载器。
 
 未设置变量时，工具箱在注册的后端中选择当前展示和操作的对象；当前在线选择不会被新出现的设备抢占，
-也可以在界面中手动选择。一个快照只代表当前选中的后端，不会合并多个设备的输入。
+连接多台设备时，控制器页右上角显示各设备名称标签，点击可切换，当前设备高亮。只有一台时仅显示名称，
+无设备时显示已支持的 NYAGEKI、LUXIS、SimGEKI IO4 标签；这些静态标签不表示已连接，也不能点击切换。
+一个快照只代表当前选中的后端，不会合并多个设备的输入。
+使用 IO4 手台进行游戏输入时，在 Segatools 页的“IO4 输入”中关闭“接管io4”，
+对应 `segatools.ini` 的 `[io4] enable=0`。缺少此项时工具箱自动补为 `1`；已有 `0` 会保留。
+此开关配置游戏侧的 IO4 接管，不改变工具箱当前选择的控制器提供者。
 内置后端可以同时运行以发现设备；普通配置命令只发给当前后端，重新扫描及释放输入等操作可覆盖所有运行中的后端。
 
 设置 `OGK_CONTROLLER_MODULE_DIR` 后进入独占的外部模块模式，只启动指定的提供者，
@@ -54,15 +61,13 @@ SDK 自身不包含硬件驱动。内置 IO4 实现使用 `node-hid`，外部模
 该版本提供 Node-API 预编译件，但是否可用仍需在目标运行时、架构和安装布局中验证；
 采用其他原生扩展时，按其要求处理预编译件或重新构建。
 
-目前没有“把任意 MU3IO DLL 放入目录即可使用”的通用加载器。已有 DLL 可以复用，
-但仍需适配进程；工具箱显示输入和配置设备，也不会自动替代游戏侧的输入驱动。
 
 ```json
 {
   "moduleId": "your-controller",
   "moduleVersion": "0.1.0",
   "moduleApiVersion": 1,
-  "ogkToolBoxVersion": "1.1.7",
+  "ogkToolBoxVersion": "1.1.8",
   "platform": "win-x64",
   "runtime": "node",
   "entryPoint": "provider.cjs"
@@ -70,17 +75,18 @@ SDK 自身不包含硬件驱动。内置 IO4 实现使用 `node-hid`，外部模
 ```
 
 `ogkToolBoxVersion` 当前要求与应用精确匹配；升级前应重测并更新清单。
-第三方模块使用独立的模块标识和版本号。`Leonardo` / `Pico` 为现有硬件的保留类型；新硬件请使用自己的类型标识。
+第三方模块使用独立的模块标识和版本号。
 
 ## 状态与功能声明
 
 完整结构以 `src/OGKToolBox.Electron/src/controller-models.ts` 为准，示例包含每个必需字段。
 `identity.kind` 可以使用自己的标识，`Unknown` 表示没有设备；`displayName` 为显示名称。
-原硬件类型 `Leonardo`、`Pico` 是保留值。`input.mappedLever` 的 UI 范围是 0–1023。
+`input.mappedLever` 的 UI 范围是 0–1023。
 无卡时 `card.identifier` 必须为空；不要记录真实卡号或无关设备标识。
 
 只声明实际实现的 `capabilities`。只读模块使用 `canWrite: false`；已完成必要同步才设置
 `readbackComplete: true`。写入后必须更新对应状态及配置 revision，不能用 `Verified` 表示仅已发送报文。
+设备已识别与功能已就绪分别显示；等待首帧、配置同步、同步失败或只读状态不应被描述为没有检测到设备。
 不支持的命令返回 `Rejected`。设备断开、异常或退出时，`releaseAll()` 必须能够反复调用并释放所有合成输入。
 
 当前通用 UI 可显示设备名、输入监视，复用已有模式、基础亮度及摇杆能力；

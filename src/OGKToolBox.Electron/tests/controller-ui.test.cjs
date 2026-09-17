@@ -56,6 +56,68 @@ const buttons = tree => elements(tree, node => node.type === 'button');
 const render = element => renderToStaticMarkup(element);
 const result = value => ({ commandId: 'test', status: 'Verified', message: '', snapshot: value });
 
+test('home status distinguishes detected but unready devices from missing devices without granting healthy status', () => {
+  const { exports } = load();
+  const ready = { ...snapshot(), identity: { kind: 'Pico', displayName: 'NYAGEKI Pro' },
+    capabilities: { ...snapshot().capabilities, inputMonitor: true } };
+  for (const [changes, text, note] of [
+    [{ state: 'ConnectedWaitingForData' }, '等待输入数据', /等待首帧输入数据/],
+    [{ state: 'SyncingDevice' }, '同步设备配置', /正在读取控制器配置/],
+    [{ state: 'SyncingHall' }, '同步 Hall 配置', /正在读取控制器配置/],
+    [{ state: 'SyncFailed' }, '同步失败', /配置同步失败/],
+    [{ state: 'Faulted' }, '控制器故障', /控制器发生故障/],
+    [{ state: 'Unsupported' }, '协议不支持', /当前协议不受支持/],
+    [{ readbackComplete: false, canWrite: false }, '等待设备状态', /等待状态回读（只读）/],
+    [{ canWrite: false, capabilities: { ...ready.capabilities, inputMonitor: false } }, '设备已连接', /已连接，未提供输入监视（只读）/]
+  ]) {
+    const view = exports.controllerStatusView({ ...ready, ...changes }, { state: 'ready' });
+    assert.equal(view.detected, true, text);
+    assert.equal(view.online, false, text);
+    assert.equal(view.text, text);
+    assert.match(view.note, note);
+    assert.doesNotMatch(view.note, /未检测到/);
+  }
+  const missing = exports.controllerStatusView({ ...ready, state: 'Searching', identity: { kind: 'Unknown', displayName: '未连接' } }, { state: 'ready' });
+  assert.equal(missing.detected, false);
+  assert.equal(missing.online, false);
+  assert.match(missing.note, /未检测到兼容的 HID 设备/);
+  const readOnly = exports.controllerStatusView({ ...ready, canWrite: false }, { state: 'ready' });
+  assert.equal(readOnly.online, true);
+  assert.match(readOnly.note, /LUXIS · 输入监视已连接（只读）/);
+  const failure = exports.controllerStatusView({ ...ready, state: 'SyncFailed', error: '设备配置校验失败' }, { state: 'ready' });
+  assert.equal(failure.note, '设备配置校验失败');
+});
+
+test('home status retains module failures and stopped state instead of trusting a stale ready snapshot', () => {
+  const { exports } = load();
+  const value = { ...snapshot(), capabilities: { ...snapshot().capabilities, inputMonitor: true } };
+  for (const [status, text, note] of [
+    [{ state: 'fault', error: '连接进程异常' }, '模块故障', /连接进程异常/],
+    [{ state: 'fault' }, '模块故障', /控制器服务发生故障/],
+    [{ state: 'stopped' }, '服务已停止', /控制器服务已停止/],
+    [{ state: 'restarting' }, '模块重启中', /正在检测/]
+  ]) {
+    const view = exports.controllerStatusView(value, status);
+    assert.equal(view.detected, false);
+    assert.equal(view.online, false);
+    assert.equal(view.text, text);
+    assert.match(view.note, note);
+    assert.doesNotMatch(view.note, /未检测到兼容/);
+  }
+});
+
+test('the home status card announces a detected sync failure instead of disconnected', () => {
+  const harness = load();
+  harness.exports.useController();
+  harness.effects.forEach(effect => effect());
+  harness.snapshotListeners[0]({ ...snapshot(), state: 'SyncFailed' });
+  harness.statusListeners[0]({ state: 'ready' });
+  const html = render(harness.exports.ControllerStatusCard());
+  assert.match(html, /aria-label="同步失败"/);
+  assert.match(html, /配置同步失败/);
+  assert.doesNotMatch(html, /未检测到|aria-label="未连接"|status-result ok/);
+});
+
 test('mode UI follows declared string modes for third-party and original devices', async () => {
   const sent = [];
   const { exports } = load({ controllerSetInputMode: async id => { sent.push(id); return result(snapshot()); } });
@@ -108,21 +170,139 @@ test('failed, rejected and missing mode results show an error without changing t
   }
 });
 
-test('device selector preserves explicit choice and sends the selected backend id', async () => {
+const deviceStatus = () => ({ state: 'ready', selectedBackendId: 'original', backends: [
+  { id: 'original', label: 'LUXIS', connected: true, selected: true, state: 'ready' },
+  { id: 'third-party', label: 'SimGEKI', connected: true, selected: false, state: 'ready' },
+  { id: 'offline', label: '离线控制器', connected: false, selected: false, state: 'fault' }
+] });
+
+function deviceSelectorHarness(bridge, command = task => task()) {
+  const states = [];
+  let cursor = 0;
+  const { exports } = load(bridge, {
+    useState(initial) {
+      const index = cursor++;
+      if (!(index in states)) states[index] = initial;
+      return [states[index], value => { states[index] = typeof value === 'function' ? value(states[index]) : value; }];
+    },
+    useRef(initial) {
+      const index = cursor++;
+      if (!(index in states)) states[index] = { current: initial };
+      return states[index];
+    }
+  });
+  return status => { cursor = 0; return exports.ControllerDeviceSelector({ status, command }); };
+}
+
+test('offline devices show supported names and one connected device shows only its own name', () => {
+  const { exports } = load();
+  const draw = status => exports.ControllerDeviceSelector({ status, command: () => { throw new Error('must not send'); } });
+  const status = deviceStatus();
+  for (const offline of [{ state: 'ready' }, { state: 'ready', backends: [] },
+    { ...status, backends: status.backends.filter(backend => !backend.connected) }]) {
+    const tree = draw(offline);
+    assert.equal(buttons(tree).length, 0);
+    assert.match(render(tree), /已支持设备：/);
+    assert.deepEqual(elements(tree, node => node.type === 'b').map(node => node.props.children), ['NYAGEKI', 'LUXIS', 'SimGEKI', 'IO4']);
+    assert.doesNotMatch(render(tree), /离线控制器|is-connected/);
+  }
+  const single = draw({ ...status, backends: status.backends.filter(backend => backend.id !== 'third-party') });
+  assert.equal(buttons(single).length, 0);
+  assert.match(render(single), /LUXIS/);
+  assert.doesNotMatch(render(single), /离线控制器|已支持设备：/);
+});
+
+test('Pico device tags display LUXIS without renaming similarly named third-party devices or routing ids', async () => {
+  const sent = [];
+  const draw = deviceSelectorHarness({ controllerSelectBackend: async id => { sent.push(id); return result(snapshot()); } });
+  const original = { id: 'original', kind: 'Pico', label: 'NYAGEKI Pro', connected: true, selected: false, state: 'ready' };
+  for (const label of ['NYAGEKI Pro', ' nyageki   pro ', 'NIA Controller Pro']) {
+    const single = draw({ state: 'ready', backends: [{ ...original, label, selected: true }] });
+    assert.equal(buttons(single).length, 0);
+    assert.match(render(single), /title="LUXIS"/);
+    assert.doesNotMatch(render(single), /NYAGEKI|nyageki|NIA/);
+  }
+  for (const kind of ['CustomController', 'pico', ' Pico ', undefined]) {
+    const label = ' nyageki   pro ';
+    const tree = draw({ state: 'ready', backends: [original,
+      { id: 'custom', kind, label, connected: true, selected: true, state: 'ready' }] });
+    assert.equal(buttons(tree)[0].props.title, 'LUXIS');
+    assert.equal(buttons(tree)[1].props.title, label);
+    assert.equal(buttons(tree)[0].props['aria-pressed'], false);
+    assert.equal(buttons(tree)[1].props['aria-pressed'], true);
+  }
+  const tree = draw({ state: 'ready', backends: [original,
+    { id: 'custom', kind: 'CustomController', label: 'NYAGEKI Pro', connected: true, selected: true, state: 'ready' }] });
+  buttons(tree)[0].props.onClick();
+  await new Promise(setImmediate);
+  assert.deepEqual(sent, ['original']);
+  assert.equal(original.label, 'NYAGEKI Pro');
+  assert.equal(original.kind, 'Pico');
+});
+
+test('connected device labels select by backend id and preserve the confirmed selection', async () => {
   const sent = [], options = [];
-  const { exports } = load({ controllerSelectBackend: async id => { sent.push(id); return result(snapshot()); } });
-  const status = { state: 'ready', backends: [
-    { id: 'original', label: 'LUXIS', connected: true, selected: true, state: 'ready' },
-    { id: 'third-party', label: '第三方控制器', connected: false, selected: false, state: 'fault' }
-  ] };
-  const tree = exports.ControllerDeviceSelector({ status, command: (task, option) => { options.push(option); return task(); } });
+  const draw = deviceSelectorHarness({ controllerSelectBackend: async id => { sent.push(id); return result(snapshot()); } },
+    (task, option) => { options.push(option); return task(); });
+  const status = deviceStatus();
+  const tree = draw(status);
+  assert.equal(buttons(tree).length, 2);
+  assert.match(render(buttons(tree)[0]), /LUXIS/);
+  assert.match(render(buttons(tree)[1]), /SimGEKI/);
+  assert.doesNotMatch(render(tree), /离线控制器/);
   assert.equal(buttons(tree)[0].props['aria-pressed'], true);
-  assert.match(render(tree), /第三方控制器/);
-  assert.match(render(tree), /不可用/);
-  await buttons(tree)[1].props.onClick();
-  await Promise.resolve();
+  assert.equal(buttons(tree)[1].props['aria-pressed'], false);
+  buttons(tree)[0].props.onClick();
+  assert.deepEqual(sent, []);
+  buttons(tree)[1].props.onClick();
+  await new Promise(setImmediate);
   assert.deepEqual(sent, ['third-party']);
   assert.equal(options[0].allowConnectionChange, true);
+  // Only confirmed status changes the selected label, never the click itself.
+  assert.equal(buttons(draw(status))[0].props['aria-pressed'], true);
+  const confirmed = { ...status, selectedBackendId: 'third-party',
+    backends: status.backends.map(backend => ({ ...backend, selected: backend.id === 'third-party' })) };
+  assert.equal(buttons(draw(confirmed))[1].props['aria-pressed'], true);
+});
+
+test('device switching blocks repeated clicks until the pending command completes', async () => {
+  const sent = [];
+  let finish;
+  const draw = deviceSelectorHarness({ controllerSelectBackend: id => {
+    sent.push(id);
+    return new Promise(resolve => { finish = resolve; });
+  } });
+  const status = deviceStatus();
+  const target = buttons(draw(status))[1];
+  target.props.onClick();
+  target.props.onClick();
+  assert.deepEqual(sent, ['third-party']);
+  assert.ok(buttons(draw(status)).every(button => button.props.disabled));
+  finish(result(snapshot()));
+  await new Promise(setImmediate);
+  assert.ok(buttons(draw(status)).every(button => !button.props.disabled));
+});
+
+test('device switch failures show an error and keep the confirmed device selected', async () => {
+  for (const outcome of ['Failed', 'Rejected', 'undefined', 'throw']) {
+    const draw = deviceSelectorHarness({ controllerSelectBackend: async () => {
+      if (outcome === 'throw') throw new Error('设备切换连接中断');
+      if (outcome === 'undefined') return undefined;
+      return { ...result(snapshot()), status: outcome, message: '设备切换未被确认' };
+    } });
+    const status = deviceStatus();
+    buttons(draw(status))[1].props.onClick();
+    await new Promise(setImmediate);
+    const tree = draw(status);
+    assert.equal(buttons(tree)[0].props['aria-pressed'], true);
+    assert.equal(buttons(tree)[1].props['aria-pressed'], false);
+    assert.ok(buttons(tree).every(button => !button.props.disabled));
+    const alerts = elements(tree, element => element.props?.role === 'alert');
+    assert.equal(alerts.length, 1, outcome);
+    assert.ok(render(alerts[0]).replace(/<[^>]*>/g, '').trim().length > 0);
+    if (outcome === 'Failed' || outcome === 'Rejected') assert.match(render(alerts[0]), /设备切换未被确认/);
+    if (outcome === 'throw') assert.match(render(alerts[0]), /设备切换连接中断/);
+  }
 });
 
 test('physical keys remain visible without virtual-input handlers', () => {
