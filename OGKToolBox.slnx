@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OGKToolBox.App/OGKToolBox.App.csproj" />
+    <Project Path="src/OGKToolBox.Application/OGKToolBox.Application.csproj" />
+    <Project Path="src/OGKToolBox.Api/OGKToolBox.Api.csproj" />
+    <Project Path="src/OGKToolBox.Core/OGKToolBox.Core.csproj" />
+    <Project Path="src/OGKToolBox.Infrastructure/OGKToolBox.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OGKToolBox.Tests/OGKToolBox.Tests.csproj" />
+  </Folder>
+</Solution>

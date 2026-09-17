@@ -1,0 +1,8 @@
+{
+  "name": "@ogktoolbox/controller-provider",
+  "version": "0.1.0",
+  "private": true,
+  "main": "server.cjs",
+  "types": "index.d.ts",
+  "license": "MIT"
+}

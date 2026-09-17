@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Application use cases and ports for OGKToolBox.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../OGKToolBox.Core/OGKToolBox.Core.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+</Project>

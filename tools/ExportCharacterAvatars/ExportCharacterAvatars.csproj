@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/OGKToolBox.Core/OGKToolBox.Core.csproj" />
+    <ProjectReference Include="../../src/OGKToolBox.Infrastructure/OGKToolBox.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

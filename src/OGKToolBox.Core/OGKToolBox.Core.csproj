@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Domain models and contracts for OGKToolBox.</Description>
+  </PropertyGroup>
+</Project>

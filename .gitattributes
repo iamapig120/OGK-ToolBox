@@ -1,0 +1,7 @@
+# Preserve exact artifact bytes across Windows/Linux checkouts for SHA-256 verification.
+src/OGKToolBox.Electron/resources/controller/** -text
+*.exe binary
+*.dll binary
+*.png binary
+*.jpg binary
+*.wav binary

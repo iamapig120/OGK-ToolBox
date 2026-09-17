@@ -1,0 +1,207 @@
+/* Allocate remaining window height to content, rather than guessing with vh
+   offsets. Only unbounded resource lists and configuration collections scroll. */
+.app[data-layout] {
+  .app-shell > aside { isolation: isolate; }
+  .app-shell > main { position: relative; z-index: 1; }
+  .workspace { padding: 16px 20px; min-height: 0; }
+  .workspace > .workspace-page-transition { display: flex; flex-direction: column; height: 100%; min-height: 0; gap: 12px; }
+  .workspace-page-transition > .page-title { flex: 0 0 auto; margin: 0; }
+  .workspace-page-transition > .filter-toolbar { flex: 0 0 auto; margin: 0; }
+  .page-title h1 { font-size: 24px; }
+  .page-title p { margin-top: 4px; }
+  .two-pane, .cards-layout, .character-layout { flex: 1 1 0; min-height: 0; height: auto; width: 100%; }
+  .music-layout, .resource-pane, .cards-layout { align-items: stretch; grid-template-columns: minmax(0, 1fr) 270px; }
+  .music-layout .list-panel, .resource-pane .table-card, .virtual-card-gallery { height: 100%; min-height: 0; max-height: none; }
+  .music-layout .inspector, .resource-pane .inspector, .cards-layout .inspector { display: flex; flex-direction: column; height: 100%; min-height: 0; max-height: 100%; padding: 12px; }
+  .music-inspector-heading { flex: 0 1 auto; overflow: visible; }
+  .music-layout .inspector .preview { width: 100%; height: min(22vh, 220px); aspect-ratio: auto; }
+  .music-inspector-heading h2 { font-size: 17px; margin-top: 10px; }
+  .music-layout .inspector-body { margin-top: 10px; }
+  .music-layout .chart-picker { margin-bottom: 8px; }
+  .music-layout .chart-open { flex-shrink: 0; margin-top: auto; }
+  .cards-layout .inspector .preview { min-height: 0; height: auto; max-height: 48vh; flex: 0 1 auto; }
+  .resource-pane .inspector .preview { flex-shrink: 1; min-height: 80px; }
+  .inspector .meta b { min-width: 0; overflow-wrap: anywhere; text-align: right; }
+  .character-layout { grid-template-columns: 240px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 12px; }
+  .character-list { grid-row: 1 / -1; }
+  .character-list { height: 100%; min-height: 0; max-height: none; }
+  .character-stage { height: 100%; min-height: 0; padding: 12px; }
+  .character-stage .preview { flex: 1 1 0; min-height: 0; }
+  .character-stage .preview > span { width: min(280px, 100%); height: 100%; min-height: 0; }
+  .character-stage .preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .expressions { display: flex; grid-column: 2; flex-direction: row; flex-wrap: wrap; gap: 6px; min-height: 0; max-height: 170px; padding: 12px; }
+  .expressions > b { width: 100%; }
+  .expressions > .empty { flex: 1; width: 100%; min-height: 0; height: auto; }
+  .expressions .expression { display: flex; flex: 0 0 auto; width: auto; min-width: 52px; min-height: 34px; margin: 0; }
+  .mods { max-width: none; grid-template-columns: minmax(0, 1fr) minmax(300px, 34%); grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+  .mod-list { height: 100%; min-height: 0; }
+  .mod-inspector { position: static; display: flex; flex-direction: column; align-self: stretch; height: 100%; min-height: 0; padding: 14px; }
+  .mod-heading { flex-shrink: 0; padding-bottom: 10px; }
+  .mod-heading h2 { font-size: 17px; }
+  .mod-state { flex-shrink: 0; margin-bottom: 8px; padding: 10px; }
+  .mod-inspector > .meta { flex-shrink: 0; padding: 7px 0; }
+  .mod-inspector .meta b { min-width: 0; overflow-wrap: anywhere; text-align: right; }
+  .mod-config { min-height: 0; margin-top: 10px; overflow: auto; }
+  .mod-config .mod-compact-entry { grid-template-columns: minmax(0, 1fr) minmax(100px, 140px); }
+  .settings-page { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+  .settings-titlebar { position: static; height: auto; margin: 0; padding: 0; flex: 0 0 auto; }
+  .settings-layout { width: 100%; max-width: 1000px; flex: 1 1 0; min-height: 0; grid-template-columns: 130px minmax(0, 1fr); }
+  .settings-nav { position: static; display: flex; flex-direction: column; width: 100%; min-height: 0; height: auto; }
+  .settings-nav button { width: 100%; min-width: 0; }
+  .settings-content { display: block; min-height: 0; overflow: auto; }
+  .settings-panel { min-height: 0; padding: 16px; }
+  .settings-panel > section + section { margin-top: 12px; padding-top: 12px; }
+  .scale-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .scale-setting > div:first-child { min-width: 0; }
+  .scale-options { flex: 0 0 auto; }
+  .sidebar-brand-controls { grid-template-columns: minmax(0, 1fr); }
+  .option-packages-page { flex: 1 1 0; min-height: 0; height: 100%; }
+  .option-package-pane { grid-template-columns: minmax(0, 1fr) 280px; grid-template-rows: minmax(0, 1fr); }
+  .option-package-list, .option-package-inspector { min-height: 0; overflow: auto; }
+  .option-package-list { display: flex; flex-direction: column; overflow: hidden; }
+  .option-package-list > .option-list-toolbar { flex: 0 0 auto; }
+  .option-package-list > .scroll { flex: 1 1 0; min-height: 0; max-height: none; }
+  .option-package-inspector { padding: 14px; gap: 12px; }
+  .diagnostic-table { flex: 1 1 0; min-height: 0; overflow: auto; }
+  .diagnostic-header, .diagnostic-row { grid-template-columns: 65px 110px minmax(0, 2fr) minmax(0, 1fr); }
+  .diagnostic-row > * { min-width: 0; overflow-wrap: anywhere; }
+  .controller-transition-shell { min-height: 0; }
+  .controller-page.is-disconnected { height: 100%; min-height: 0; }
+  .disconnected-state-surface { flex: 1 1 0; height: auto; min-height: 0; padding: 16px; }
+  .disconnected-empty { width: min(560px, 100%); gap: 10px; }
+  .disconnected-empty p { width: 100%; }
+  .connection-check { height: auto; min-height: 150px; flex: 0 0 auto; padding: 14px 18px; }
+  .monitor-hardware-footer { left: 16px; right: 16px; width: auto; }
+  .player-overlay { padding: 12px; }
+  .chart-player-electron { height: calc(100vh - 24px); }
+  .chart-player-electron .player-options { display: block; min-height: 0; }
+  .chart-player-electron .parameter-stepper { padding: 8px 0; gap: 6px; }
+  .chart-player-electron .option-stats { margin-top: 8px; padding: 6px 10px; }
+  .chart-player-electron .option-stats span { padding: 4px 0; }
+  .chart-player-electron .display-controls { margin-top: 8px; padding: 8px 0; }
+  .chart-player-electron .audio-controls { padding-top: 8px; }
+}
+
+@media (orientation: landscape) {
+  .app[data-layout="standard"] .chart-player-electron { width: 100%; grid-template-columns: 220px minmax(0, 1fr) 240px; }
+  .app[data-layout="standard"] .chart-player-electron .player-jacket { height: min(25vh, 220px); }
+}
+
+/* The hardware diagram has fixed coordinate geometry. Fit that workbench as a
+   unit on short windows; retain the normal-sized page header and dialogs. */
+@media (orientation: landscape) and (max-height: 920px) {
+  .app[data-layout="standard"] .controller-transition-shell,
+  .app[data-layout="standard"] .controller-page > .controller-skeleton {
+    zoom: clamp(.65, calc((100vh - 150px) / 790px), 1);
+  }
+}
+@media (orientation: portrait) and (max-height: 1700px) {
+  .app[data-layout="portrait"] .controller-transition-shell {
+    zoom: clamp(.55, calc((100vh - 350px) / 1470px), 1);
+  }
+}
+
+.app[data-layout="portrait"] {
+  .option-directory-summary { grid-template-columns: minmax(0, 1fr) repeat(3, auto); gap: 16px; }
+  .mods { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .mods .mod-category .row { grid-template-columns: minmax(0, 1fr) auto auto 16px; }
+  .mods .mod-category .row > .mod-row-copy { grid-column: 1; }
+  .mods .mod-category .row > em { grid-column: 2; }
+  .mods .mod-category .row > button { grid-column: 3; }
+  .mod-expand-caret { grid-column: 4; justify-self: center; transition: transform 220ms cubic-bezier(.22, 1, .36, 1); }
+  .mod-expand-caret.is-expanded { transform: rotate(225deg); }
+  .mods .mod-category .row { transition: background-color 160ms ease-out; }
+  .mods .mod-category .row.selected-row { background: #eef0f3 !important; color: #293548 !important; }
+  .mods .mod-category .row.selected-row b { color: inherit; }
+  .mod-inline-details { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 220ms cubic-bezier(.22, 1, .36, 1), opacity 160ms ease-out; }
+  .mod-inline-details.is-expanded { grid-template-rows: 1fr; opacity: 1; }
+  @starting-style {
+    .mod-inline-details.is-expanded { grid-template-rows: 0fr; opacity: 0; }
+  }
+  .mod-inline-clip { min-height: 0; overflow: hidden; }
+  .mod-inline-content { padding: 16px 20px; border-bottom: 1px solid #dce2ea; }
+  .mod-inline-details .mod-config { overflow: visible; }
+  .mod-inline-details .meta b { overflow-wrap: anywhere; text-align: right; }
+  &.dark .mod-inline-content { border-color: #344354; }
+  &.dark .mods .mod-category .row.selected-row { background: #303b49 !important; color: #e2e8f0 !important; }
+  .option-package-pane { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(260px, 34%); }
+  .mod-config { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); column-gap: 20px; }
+  .option-package-inspector .option-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; }
+  .option-package-inspector .option-meta > div:first-child { grid-column: 1 / -1; }
+  .brand { min-height: 48px; padding: 6px 20px; }
+  .app-shell > aside nav { padding-bottom: 8px; }
+  .home-nav-section { margin: 0; padding: 0; border: 0; }
+  .character-layout { grid-template-columns: 250px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .character-list { grid-row: 1 / -1; }
+  .expressions { grid-column: 2; max-height: 200px; flex-direction: row; flex-wrap: wrap; align-content: start; }
+  .expressions > b { width: 100%; }
+  .expressions .expression { width: auto; min-width: 52px; }
+  .settings-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .settings-nav { flex-direction: row; }
+  .settings-nav button { width: auto; min-width: 90px; }
+}
+
+@media (orientation: landscape) and (max-width: 1280px) {
+  .app[data-layout="standard"] {
+    .app-shell { grid-template-columns: 164px minmax(0, 1fr); }
+    .brand { padding: 10px; gap: 7px; }
+    .brand span { font-size: 12px; }
+    .workspace { padding: 12px 16px; }
+    .home-page { height: 100%; min-height: 0; gap: 12px; }
+    .status-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .status { min-height: 90px; padding: 12px; }
+    .status b { font-size: 17px; }
+    .home-page .health { min-height: 0; }
+    .home-page .health-body { grid-template-columns: minmax(0, 1fr) 280px; }
+    .home-page .health-head { height: 58px; flex-shrink: 0; }
+    .home-page .quick { padding: 12px; gap: 8px; border-left: 1px solid var(--pencil-border); border-top: 0; }
+    .home-page .check { min-height: 48px; }
+    .character-layout { grid-template-columns: 200px minmax(0, 1fr); }
+    .settings-layout { grid-template-columns: 100px minmax(0, 1fr); gap: 12px; }
+    .theme-swatch { height: 40px; }
+    .scale-setting { flex-wrap: wrap; }
+    .scale-setting p { max-width: 50ch; }
+    .option-directory-summary { gap: 12px; }
+  }
+}
+
+@media (orientation: portrait) and (max-width: 800px) {
+  .app[data-layout="portrait"] {
+    .scale-setting { grid-template-columns: minmax(0, 1fr); }
+    .scale-options { width: auto; justify-self: start; }
+    .music-layout, .resource-pane, .cards-layout { grid-template-columns: minmax(0, 1fr) 240px; }
+    .mod-category .row { grid-template-columns: minmax(0, 1fr) auto; padding: 8px; }
+    .mod-category .row > button { grid-column: 2; }
+    .character-layout { grid-template-columns: 190px minmax(0, 1fr); }
+  }
+}
+
+/* Card details no longer reserve space in the gallery. The dialog uses the
+   existing surface, preview, metadata and button styles in the top layer. */
+.app[data-layout="portrait"] .cards-layout { grid-template-columns: minmax(0, 1fr); }
+.card-details-dialog {
+  width: min(440px, calc(100vw - 40px));
+  height: min(780px, calc(100vh - 40px));
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  color: #263244;
+  box-shadow: 0 24px 72px #0004;
+}
+.card-details-dialog[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.card-details-dialog::backdrop { background: #0b101866; }
+.card-details-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid #dce2ea; }
+.card-details-dialog > .inspector { display: flex; flex-direction: column; min-height: 0; height: 100%; padding: 16px; overflow: auto; border: 0; border-radius: 0; }
+.card-details-dialog .preview { flex: 1 1 0; width: 100%; height: auto; min-height: 120px; }
+.card-details-dialog .preview img { width: 100%; height: 100%; object-fit: contain; }
+.card-details-dialog .inspector h2 { flex: 0 0 auto; margin: 12px 0 0; font-size: 18px; overflow-wrap: anywhere; }
+.card-details-dialog .inspector-body { flex: 0 0 auto; margin-top: 12px; }
+.dark .card-details-dialog { background: #1d2530; color: #ebeff5; border-color: #344354; }
+.dark .card-details-header { border-color: #344354; }
+
+@media (prefers-reduced-motion: reduce) {
+  .app[data-layout="portrait"] .mod-inline-details,
+  .app[data-layout="portrait"] .mod-expand-caret,
+  .app[data-layout="portrait"] .mods .mod-category .row { transition: none; }
+}

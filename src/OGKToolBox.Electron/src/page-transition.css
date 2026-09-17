@@ -1,0 +1,84 @@
+:root {
+  view-transition-name: none;
+  --page-motion-duration: 220ms;
+  --page-motion-exit: 150ms;
+  --page-motion-ease: cubic-bezier(.22, 1, .36, 1);
+}
+
+.workspace { view-transition-name: workspace; }
+
+/* Keep the shell stable; snapshots never intercept navigation input. */
+::view-transition { pointer-events: none; }
+::view-transition-group(root) { animation: none; }
+::view-transition-old(root) { display: none; }
+::view-transition-new(root) { animation: none; }
+::view-transition-group(workspace) { animation: none; }
+::view-transition-image-pair(workspace) { isolation: isolate; overflow: clip; }
+::view-transition-old(workspace),
+::view-transition-new(workspace) {
+  mix-blend-mode: normal;
+  transform-origin: center top;
+  animation-timing-function: var(--page-motion-ease);
+  animation-fill-mode: both;
+}
+::view-transition-old(workspace) {
+  animation-name: workspace-page-out;
+  animation-duration: var(--page-motion-exit);
+}
+::view-transition-new(workspace) {
+  animation-name: workspace-page-in;
+  animation-duration: var(--page-motion-duration);
+}
+
+@keyframes workspace-page-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-4px); }
+}
+@keyframes workspace-page-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Runtime fallback also covers a disabled snapshot API. */
+.workspace-page-transition {
+  min-height: 100%;
+  animation: workspace-page-in var(--page-motion-duration) var(--page-motion-ease);
+}
+:root[data-page-transition="native"] .workspace-page-transition { animation: none; }
+
+.app .nav-active-indicator {
+  transition: transform var(--page-motion-duration) var(--page-motion-ease), opacity 100ms ease-out;
+}
+.app-shell > aside nav button {
+  transition: color 150ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out;
+}
+.settings-content { animation: workspace-page-in 180ms var(--page-motion-ease); }
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-page-transition, .settings-content { animation: none; }
+  .app .nav-active-indicator, .app-shell > aside nav button { transition: none; }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none; }
+}
+
+/* Hover must leave the selected navigation surface visible underneath. */
+.app[data-layout="standard"] .app-shell > aside nav button.selected:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+}
+
+/* Shared opening motion for filters, configuration pickers and backup menus. */
+.filter-popover, .backup-popover, .launch-settings-popover {
+  transform-origin: top left;
+  animation: menu-reveal 160ms cubic-bezier(.22, 1, .36, 1);
+}
+.mu3io-menu, .bgm-menu, .server-menu { overflow-y: auto; overscroll-behavior: contain; }
+@keyframes menu-reveal {
+  from { opacity: 0; transform: translateY(-4px) scaleY(.97); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .filter-popover, .backup-popover, .launch-settings-popover { animation: none; }
+}
+.diagnostic-filters .filter-control { position: relative; min-width: 126px; z-index: 4; }

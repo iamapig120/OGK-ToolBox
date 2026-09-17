@@ -1,0 +1,35 @@
+{
+  "name": "ogk-toolbox-electron",
+  "version": "1.1.7",
+  "private": true,
+  "description": "OGK ToolBox Electron desktop frontend",
+  "author": "OGKToolBox",
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "dev": "npm run verify:controller && npm run build:main && concurrently -k \"vite --host=127.0.0.1 --port=5173 --strictPort\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "build:main": "tsc -p tsconfig.electron.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json --noEmit",
+    "build": "npm run build:main && vite build",
+    "publish:api": "dotnet publish ../OGKToolBox.Api/OGKToolBox.Api.csproj -c Release -r win-x64 --self-contained true -o ../OGKToolBox.Api/bin/Release/net8.0/publish",
+    "pack:win": "npm run publish:api && npm run verify:controller && npm run build && electron-builder --win nsis --publish never",
+    "release:win": "npm run publish:api && npm run verify:controller && npm run build && electron-builder --win nsis --publish always",
+    "verify:controller": "node scripts/verify-controller.cjs",
+    "test": "node --test tests/*.test.cjs"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^9.2.1",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.8.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "wait-on": "^9.0.3"
+  }
+}

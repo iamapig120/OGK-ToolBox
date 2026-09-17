@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>OGKToolBox</AssemblyName>
+    <RootNamespace>OGKToolBox.App</RootNamespace>
+    <AssemblyTitle>春菜的便当盒</AssemblyTitle>
+    <Product>春菜的便当盒</Product>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets/haruna-lunchbox.jpg" />
+    <Content Include="../OGKToolBox.Electron/assets/chart/*.wav" Link="Assets/chart/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <ProjectReference Include="../OGKToolBox.Core/OGKToolBox.Core.csproj" />
+    <ProjectReference Include="../OGKToolBox.Infrastructure/OGKToolBox.Infrastructure.csproj" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../tools/vgmstream/**" Link="tools/vgmstream/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

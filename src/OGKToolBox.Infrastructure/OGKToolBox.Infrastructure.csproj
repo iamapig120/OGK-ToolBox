@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../OGKToolBox.Application/OGKToolBox.Application.csproj" />
+    <ProjectReference Include="../OGKToolBox.Core/OGKToolBox.Core.csproj" />
+    <PackageReference Include="AssetsTools.NET" />
+    <PackageReference Include="AssetsTools.NET.MonoCecil" />
+    <PackageReference Include="AssetsTools.NET.Texture" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="NAudio" />
+    <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
+    <PackageReference Include="StbImageWriteSharp" />
+  </ItemGroup>
+</Project>

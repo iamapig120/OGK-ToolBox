@@ -1,0 +1,121 @@
+<UserControl x:Class="OGKToolBox.App.Views.SegaToolsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,0,16">
+            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Segatools 配置" Style="{StaticResource PageTitle}"/>
+                <TextBlock Text="集中检查街机环境、AM daemon、游戏参数与 BepInEx 配置；保存前必须审查差异。" Style="{StaticResource MutedText}" Margin="0,5,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="1" Content="重新读取" Command="{Binding RefreshCommand}" VerticalAlignment="Center"/>
+        </Grid>
+
+        <Border Grid.Row="1" Background="{DynamicResource InfoSoftBrush}" CornerRadius="7" Padding="14,11" Margin="0,0,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="26"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <TextBlock Text="&#xE72E;" Style="{StaticResource FluentIcon}" Foreground="{DynamicResource InfoBrush}" HorizontalAlignment="Left"/>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="受保护编辑" Foreground="{DynamicResource InfoBrush}" FontWeight="SemiBold"/>
+                    <TextBlock Text="INI 修改先进入草稿与差异预览，保存时检查并发修改和游戏进程，再备份并原子替换。JSON 与敏感标识目前保持只读。" Style="{StaticResource MutedText}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="250"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Border Style="{StaticResource SurfacePanel}" Padding="8">
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <TextBlock Text="配置文件" Style="{StaticResource SectionTitle}" Margin="8,7,8,8"/>
+                    <ListBox Grid.Row="1" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/>
+                                    <Grid Grid.Row="1" Margin="0,4,0,0">
+                                        <TextBlock Text="{Binding StatusText}" Style="{StaticResource CaptionText}"/>
+                                        <TextBlock Text="{Binding LastWriteText}" Style="{StaticResource CaptionText}" HorizontalAlignment="Right"/>
+                                    </Grid>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <StackPanel Grid.Row="2" Margin="8,10,8,7">
+                        <TextBlock Text="mu3hook" Style="{StaticResource CaptionText}"/>
+                        <TextBlock Text="{Binding HookVersion}" FontWeight="SemiBold" Margin="0,3,0,0" TextWrapping="Wrap" TextTrimming="None"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource SurfacePanel}" Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedFile.DisplayName, FallbackValue=尚未选择配置}" Style="{StaticResource SectionTitle}"/>
+                            <TextBlock Text="{Binding SelectedFile.Path}" Style="{StaticResource CaptionText}" Margin="0,4,18,0" TextWrapping="Wrap" TextTrimming="None"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                            <TextBlock Text="{Binding SelectedFile.EncodingName, StringFormat=编码 {0}}" Style="{StaticResource CaptionText}" HorizontalAlignment="Right"/>
+                            <TextBlock Text="{Binding SelectedFile.NewLineName, StringFormat=换行 {0}}" Style="{StaticResource CaptionText}" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="330"/></Grid.ColumnDefinitions>
+                        <DataGrid ItemsSource="{Binding SelectedFile.Entries}" SelectedItem="{Binding SelectedEntry}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="段 / 路径" Binding="{Binding Section}" Width="135"/>
+                                <DataGridTextColumn Header="配置项" Binding="{Binding Key}" Width="145"/>
+                                <DataGridTextColumn Header="当前值" Binding="{Binding DisplayValue}" Width="2*"/>
+                                <DataGridTextColumn Header="类型" Binding="{Binding ValueKind}" Width="80"/>
+                                <DataGridCheckBoxColumn Header="Schema" Binding="{Binding IsKnown}" Width="65"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Border Grid.Column="2" Background="{DynamicResource SurfaceSubtleBrush}" CornerRadius="7" Padding="15">
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="编辑草稿" Style="{StaticResource SectionTitle}"/>
+                                    <TextBlock Text="{Binding SelectedEntry.Description}" Style="{StaticResource MutedText}" TextWrapping="Wrap" TextTrimming="None" Margin="0,5,0,0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Margin="0,15,0,0">
+                                    <TextBlock Text="新值" Style="{StaticResource CaptionText}" Margin="1,0,0,4"/>
+                                    <TextBox Text="{Binding DraftValue, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanEditSelectedEntry}"/>
+                                    <TextBlock Text="JSON、敏感字段及缺失文件暂不允许编辑。" Style="{StaticResource CaptionText}" TextWrapping="Wrap" TextTrimming="None" Margin="1,5,0,0"/>
+                                </StackPanel>
+                                <WrapPanel Grid.Row="2" Margin="0,12,0,0">
+                                    <Button Content="生成差异" Command="{Binding PreviewChangeCommand}" IsEnabled="{Binding HasDraftChange}" Margin="0,0,7,0"/>
+                                    <Button Content="放弃草稿" Command="{Binding RevertDraftCommand}" IsEnabled="{Binding HasDraftChange}" Style="{StaticResource SubtleButton}"/>
+                                </WrapPanel>
+                                <Border Grid.Row="3" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="11" Margin="0,14,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="差异预览" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding PreviewSummary}" Style="{StaticResource MutedText}" TextWrapping="Wrap" TextTrimming="None" Margin="0,5,0,0"/>
+                                        <ItemsControl ItemsSource="{Binding ChangePreview.Changes}" Margin="0,8,0,0">
+                                            <ItemsControl.ItemTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding OriginalValue, StringFormat=原值：{0}}" FontFamily="Consolas" TextWrapping="Wrap" TextTrimming="None"/><TextBlock Text="{Binding NewValue, StringFormat=新值：{0}}" FontFamily="Consolas" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" TextTrimming="None" Margin="0,3,0,0"/></StackPanel></DataTemplate></ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Grid.Row="4" Text="{Binding LastBackupPath, StringFormat=最近备份：{0}}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" TextTrimming="None" VerticalAlignment="Bottom" Margin="0,12,0,0"/>
+                                <Button Grid.Row="5" Content="确认并保存" Command="{Binding SavePreviewCommand}" IsEnabled="{Binding CanSavePreview}" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Stretch" Margin="0,12,0,0"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <Grid Grid.Row="2" Margin="0,11,0,0">
+                        <TextBlock Text="{Binding StatusText}" Style="{StaticResource CaptionText}"/>
+                        <TextBlock Text="{Binding ConfigurationSummary}" Style="{StaticResource CaptionText}" HorizontalAlignment="Right"/>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

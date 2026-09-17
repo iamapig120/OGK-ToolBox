@@ -1,0 +1,16 @@
+OGKToolBox Controller Module - Proprietary Binary
+Copyright (c) 2026 lynshp. All rights reserved.
+
+This directory contains a precompiled, closed-source controller component.
+It is excluded from the MIT license covering OGKToolBox's original source code.
+
+Permission is granted to download and execute the unmodified component with
+OGKToolBox, including local development and testing of OGKToolBox.
+No source-code license, modification license, or permission to integrate this
+component into other products is granted. Other use or redistribution requires
+prior written permission from the copyright holder.
+
+Third-party components retain their respective licenses and notices. This notice
+does not restrict rights granted independently by those third-party licenses.
+THE COMPONENT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, TO THE EXTENT
+PERMITTED BY APPLICABLE LAW.

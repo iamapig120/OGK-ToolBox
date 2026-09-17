@@ -1,0 +1,22 @@
+{
+    "condition" :
+    {
+        "dipsw" :
+        {
+            "value" : 1,
+            "mask" : 1
+        }
+    },
+    
+    "lan_install" :
+    {
+        "enable" : true,
+        "server" : true,
+        "interval" : 20
+    },
+
+    "net_delivery" :
+    {
+        "enable" : true
+    }
+}

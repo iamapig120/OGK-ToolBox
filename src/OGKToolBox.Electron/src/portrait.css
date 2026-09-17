@@ -1,0 +1,79 @@
+/* Portrait workstation: keep the full navigation and every inspector reachable.
+   Scope to the chosen layout so the established desktop composition is preserved. */
+.app[data-layout="portrait"] {
+  &.preview-frame { width: 100vw; height: 100vh; min-height: 0; }
+  .app-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .app-shell > aside { border-right: 0; border-bottom: 1px solid var(--pencil-border); }
+  .brand { height: auto; min-height: 56px; padding: 10px 20px; }
+  .app-shell > aside nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; padding: 8px 20px 14px; }
+  .nav-section { display: contents; }
+  .nav-section-label, .nav-divider, .nav-active-indicator { display: none; }
+  .app-shell > aside nav button { height: auto; min-height: 44px; padding: 8px; justify-content: center; gap: 7px; }
+  .app-shell > aside nav button.selected { background: #fff0e9; border-color: #f3bba3; }
+  &.dark .app-shell > aside nav button.selected { background: #3a241e; border-color: #80513f; }
+  main { grid-template-rows: auto minmax(0, 1fr); }
+  main:not(:has(.home-page)) { grid-template-rows: minmax(0, 1fr); }
+  .workspace { padding: 24px; container-type: inline-size; }
+  .page-title, .filter-toolbar, .header-actions, .toolbar { flex-wrap: wrap; gap: 12px; }
+  .page-title > div, header > div:first-child { min-width: 0; }
+  .page-title p, .meta b { overflow-wrap: anywhere; }
+  .filter-toolbar input { flex: 1 1 240px; width: auto; min-width: 0; }
+  .home-page { height: auto; min-height: 0; gap: 24px; }
+  .status-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .status { min-width: 0; }
+  .home-page .health-body { grid-template-columns: minmax(0, 1fr); }
+  .home-page .quick { border-left: 0; border-top: 1px solid var(--pencil-border); }
+  .home-page .checks { overflow: visible; }
+  .home-page .check { min-height: 72px; }
+  .music-layout, .resource-pane, .cards-layout { height: auto; min-height: 0; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
+  .music-layout .list-panel, .resource-pane .table-card, .virtual-card-gallery { height: max(480px, calc(100vh - 370px)); min-height: 0; }
+  .music-layout .inspector, .resource-pane .inspector, .cards-layout .inspector { display: flex; height: auto; max-height: none; min-width: 0; }
+  .resource-pane .inspector { flex-direction: column; }
+  .music-inspector-heading { flex-basis: auto; overflow: visible; }
+  .music-layout .chart-open { margin-top: 16px; }
+  .character-layout { height: auto; min-height: 0; grid-template-columns: 220px minmax(0, 1fr); }
+  .character-list { max-height: 700px; }
+  .character-stage { min-height: 560px; }
+  .expressions { display: block; grid-column: 1 / -1; }
+  .expressions .expression { display: inline-flex; width: auto; min-width: 64px; min-height: 40px; margin: 8px 8px 0 0; }
+  .settings-layout { grid-template-columns: minmax(0, 1fr); max-width: 900px; }
+  .settings-nav { display: flex; flex-direction: row; width: 100%; height: auto; min-height: 0; }
+  .settings-panel { min-height: 0; }
+  .settings-nav button { width: auto; min-width: 90px; margin: 0; }
+  .setting-row { flex-wrap: wrap; gap: 16px; }
+  .sidebar-brand-controls { grid-template-columns: minmax(0, 1fr); }
+  .scale-options { justify-content: flex-start; }
+  .option-package-pane, .mods { grid-template-columns: minmax(0, 1fr); }
+  .option-package-inspector { min-height: 0; }
+  .diagnostic-header, .diagnostic-row { grid-template-columns: 70px 130px minmax(0, 2fr) minmax(0, 1fr); }
+  .diagnostic-row > * { min-width: 0; overflow-wrap: anywhere; }
+  .controller-monitor-surface { height: auto; min-height: 0; }
+  .monitor-body { grid-template-columns: minmax(0, 1fr); }
+  .signal-canvas { min-height: 480px; }
+  .monitor-hardware-footer { left: 20px; right: 20px; width: auto; }
+  .monitor-inspector { min-height: 510px; }
+  .controller-accordions { grid-template-columns: minmax(0, 1fr); height: auto; gap: 14px; }
+  .player-overlay { position: fixed; width: auto; height: auto; padding: 16px; }
+  .chart-player-electron { width: 100%; height: calc(100vh - 32px); grid-template-columns: minmax(0, 1fr) 260px; grid-template-rows: minmax(0, 1fr) minmax(220px, 52%); }
+  .chart-player-electron .player-stage { grid-column: 1; grid-row: 1 / -1; }
+  .chart-player-electron .player-info { grid-column: 2; grid-row: 1; overflow: auto; }
+  .chart-player-electron .player-options { display: block; grid-column: 2; grid-row: 2; overflow: auto; }
+}
+
+/* Also covers Windows display scaling: CSS viewport may be 720 × 1280. */
+@container (max-width: 760px) {
+  .app[data-layout="portrait"] {
+    .music-layout, .resource-pane, .cards-layout { grid-template-columns: minmax(0, 1fr); }
+    .music-layout .list-panel, .resource-pane .table-card, .virtual-card-gallery { height: 480px; }
+    .music-layout .inspector, .cards-layout .inspector { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+    .status-grid { grid-template-columns: minmax(0, 1fr); }
+    .character-layout { grid-template-columns: 170px minmax(0, 1fr); }
+    .config-entry { grid-template-columns: minmax(0, 1fr); }
+    .config-heading, summary { grid-template-columns: minmax(0, 1fr) 80px 100px; }
+    .resource-grid-header, .resource-grid-row { grid-template-columns: minmax(0, 1fr) 70px 70px 60px; }
+  }
+}
+@media (max-width: 760px) {
+  .app[data-layout="portrait"] .app-shell > aside nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .app[data-layout="portrait"] .workspace { padding: 16px; }
+}

@@ -1,0 +1,9 @@
+{
+  "moduleId": "example-controller",
+  "moduleVersion": "0.1.0",
+  "moduleApiVersion": 1,
+  "ogkToolBoxVersion": "1.1.7",
+  "platform": "win-x64",
+  "runtime": "node",
+  "entryPoint": "provider.cjs"
+}

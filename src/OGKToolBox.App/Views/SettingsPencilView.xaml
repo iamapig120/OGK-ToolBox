@@ -1,0 +1,56 @@
+<UserControl x:Class="OGKToolBox.App.Views.SettingsPencilView"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <UserControl.Resources>
+  <Style x:Key="SettingCard" TargetType="Border" BasedOn="{StaticResource SurfacePanel}">
+   <Setter Property="Padding" Value="20"/>
+   <Setter Property="Margin" Value="0,0,0,14"/>
+  </Style>
+ </UserControl.Resources>
+ <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+  <StackPanel MaxWidth="858" HorizontalAlignment="Stretch">
+   <TextBlock Text="&#x8BBE;&#x7F6E;" Style="{StaticResource PageTitle}"/>
+   <TextBlock Text="&#x8C03;&#x6574;&#x5DE5;&#x5177;&#x7BB1;&#x7684;&#x89C6;&#x89C9;&#x3001;&#x5C3A;&#x5BF8;&#x4E0E;&#x4EA4;&#x4E92;&#x504F;&#x597D;&#x3002;" Style="{StaticResource MutedText}" Margin="0,5,0,20"/>
+
+   <Border Style="{StaticResource SettingCard}">
+    <StackPanel>
+     <TextBlock Text="&#x5E94;&#x7528;&#x4E3B;&#x9898;" Style="{StaticResource SectionTitle}"/>
+     <TextBlock Text="&#x4E3B;&#x9898;&#x4F1A;&#x7ACB;&#x5373;&#x5207;&#x6362;&#x5E76;&#x4FDD;&#x5B58;&#x3002;" Style="{StaticResource MutedText}" Margin="0,6,0,12" TextWrapping="Wrap" TextTrimming="None"/>
+     <WrapPanel>
+      <Button Content="&#x6D45;&#x8272;" Command="{Binding SetThemeCommand}" CommandParameter="Light" Margin="0,0,8,8"/>
+      <Button Content="&#x6DF1;&#x8272;" Command="{Binding SetThemeCommand}" CommandParameter="Dark" Margin="0,0,8,8"/>
+      <Button Content="&#x8DDF;&#x968F;&#x7CFB;&#x7EDF;" Command="{Binding SetThemeCommand}" CommandParameter="System" Margin="0,0,0,8"/>
+     </WrapPanel>
+    </StackPanel>
+   </Border>
+
+   <Border Style="{StaticResource SettingCard}">
+    <StackPanel>
+     <TextBlock Text="UI &#x4E0E;&#x6587;&#x5B57;&#x5927;&#x5C0F;" Style="{StaticResource SectionTitle}"/>
+     <TextBlock Text="&#x5C0F;&#x53F7;&#x662F;&#x5F53;&#x524D;&#x9ED8;&#x8BA4;&#x5C3A;&#x5BF8;&#x3002;&#x653E;&#x5927;&#x65F6;&#xFF0C;&#x6587;&#x5B57;&#x3001;&#x63A7;&#x4EF6;&#x4E0E;&#x95F4;&#x8DDD;&#x4F1A;&#x540C;&#x6B65;&#x8C03;&#x6574;&#xFF0C;&#x9875;&#x9762;&#x4F1A;&#x6309;&#x53EF;&#x7528;&#x7A7A;&#x95F4;&#x91CD;&#x65B0;&#x5E03;&#x5C40;&#x3002;" Style="{StaticResource MutedText}" Margin="0,6,0,12" TextWrapping="Wrap" TextTrimming="None"/>
+     <ComboBox Width="220" HorizontalAlignment="Left"
+               ItemsSource="{Binding UiScaleOptions}"
+               DisplayMemberPath="Label"
+               SelectedValuePath="Scale"
+               SelectedValue="{Binding SelectedUiScale, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+               ToolTip="&#x8C03;&#x6574;&#x6574;&#x4E2A;&#x5DE5;&#x5177;&#x7BB1;&#x7684; UI &#x548C;&#x6587;&#x5B57;&#x6BD4;&#x4F8B;"/>
+    </StackPanel>
+   </Border>
+
+   <Border Style="{StaticResource SettingCard}">
+    <StackPanel>
+     <TextBlock Text="&#x52A8;&#x6548;" Style="{StaticResource SectionTitle}"/>
+     <TextBlock Text="&#x6309;&#x94AE;&#x548C;&#x5217;&#x8868;&#x5728;&#x60AC;&#x505C;&#x3001;&#x70B9;&#x51FB;&#x65F6;&#x5747;&#x4F7F;&#x7528;&#x8F7B;&#x91CF;&#x52A8;&#x6548;&#x3002;" Style="{StaticResource MutedText}" Margin="0,6,0,0" TextWrapping="Wrap" TextTrimming="None"/>
+    </StackPanel>
+   </Border>
+
+   <Border Style="{StaticResource SettingCard}" Margin="0">
+    <StackPanel>
+     <TextBlock Text="&#x672C;&#x5730;&#x6570;&#x636E;" Style="{StaticResource SectionTitle}"/>
+     <TextBlock Text="SQLite &#x7D22;&#x5F15;&#x3001;&#x7F13;&#x5B58;&#x4E0E;&#x914D;&#x7F6E;&#x5907;&#x4EFD;&#x5B58;&#x50A8;&#x5728; %LocalAppData%\OGKToolBox&#x3002;" Style="{StaticResource MutedText}" TextWrapping="Wrap" TextTrimming="None" Margin="0,7,0,0"/>
+     <TextBlock Text="A000&#x3001;Option &#x4E0E;&#x5546;&#x4E1A;&#x8D44;&#x6E90;&#x59CB;&#x7EC8;&#x53EA;&#x8BFB;&#x3002;" Style="{StaticResource MutedText}" TextWrapping="Wrap" TextTrimming="None" Margin="0,5,0,0"/>
+    </StackPanel>
+   </Border>
+  </StackPanel>
+ </ScrollViewer>
+</UserControl>

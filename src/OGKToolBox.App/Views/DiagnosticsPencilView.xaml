@@ -1,0 +1,31 @@
+<UserControl x:Class="OGKToolBox.App.Views.DiagnosticsPencilView"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <Grid Background="{DynamicResource WorkspaceBrush}">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+  <StackPanel>
+   <TextBlock Text="&#x8BCA;&#x65AD;" Style="{StaticResource PageTitle}"/>
+   <TextBlock Text="&#x68C0;&#x67E5;&#x8D44;&#x6E90;&#x626B;&#x63CF;&#x4E2D;&#x53D1;&#x73B0;&#x7684;&#x95EE;&#x9898;&#x3002;" Style="{StaticResource MutedText}" Margin="0,5,0,18"/>
+  </StackPanel>
+  <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,16">
+   <Border Style="{StaticResource SurfacePanel}" Margin="0,0,10,0" Padding="14,12"><StackPanel><TextBlock Text="&#x603B;&#x95EE;&#x9898;" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding Diagnostics.Count}" FontSize="24" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel></Border>
+   <Border Style="{StaticResource SurfacePanel}" Margin="0,0,10,0" Padding="14,12"><StackPanel><TextBlock Text="&#x8D44;&#x6E90;&#x626B;&#x63CF;" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" Margin="0,7,0,0"/></StackPanel></Border>
+   <Border Style="{StaticResource SurfacePanel}" Margin="0,0,10,0" Padding="14,12"><StackPanel><TextBlock Text="&#x6E38;&#x620F;&#x7248;&#x672C;" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding GameVersionDisplay}" FontSize="18" FontWeight="SemiBold" Margin="0,6,0,0"/></StackPanel></Border>
+   <Border Style="{StaticResource SurfacePanel}" Padding="14,12"><StackPanel><TextBlock Text="Segatools" Style="{StaticResource CaptionText}"/><TextBlock Text="{Binding SegaToolsStatus}" FontSize="18" FontWeight="SemiBold" Margin="0,6,0,0"/></StackPanel></Border>
+  </UniformGrid>
+  <Border Grid.Row="2" Style="{StaticResource SurfacePanel}" Padding="0">
+   <Grid><Grid.RowDefinitions><RowDefinition Height="58"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <Grid Margin="18,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+     <TextBlock Text="&#x95EE;&#x9898;&#x5217;&#x8868;" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+     <TextBlock Grid.Column="1" Text="{Binding Diagnostics.Count, StringFormat=&#x5171; {0} &#x9879;}" Style="{StaticResource CaptionText}" VerticalAlignment="Center"/>
+    </Grid>
+    <DataGrid Grid.Row="1" ItemsSource="{Binding Diagnostics}" BorderThickness="0"><DataGrid.Columns>
+     <DataGridTextColumn Header="&#x7EA7;&#x522B;" Binding="{Binding Severity}" Width="100"/>
+     <DataGridTextColumn Header="&#x4EE3;&#x7801;" Binding="{Binding Code}" Width="180"/>
+     <DataGridTextColumn Header="&#x8BF4;&#x660E;" Binding="{Binding Message}" Width="2*"/>
+     <DataGridTextColumn Header="&#x6765;&#x6E90;" Binding="{Binding SourcePath}" Width="2*"/>
+    </DataGrid.Columns></DataGrid>
+   </Grid>
+  </Border>
+ </Grid>
+</UserControl>

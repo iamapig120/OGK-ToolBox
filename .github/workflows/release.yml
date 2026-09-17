@@ -1,0 +1,59 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/OGKToolBox.Electron/package-lock.json
+      - run: dotnet restore OGKToolBox.slnx
+      - run: dotnet test OGKToolBox.slnx -c Release --no-restore
+      - run: npm ci
+        working-directory: src/OGKToolBox.Electron
+      - run: npm run verify:controller
+        working-directory: src/OGKToolBox.Electron
+      - run: npm test
+        working-directory: src/OGKToolBox.Electron
+      - run: npm run typecheck
+        working-directory: src/OGKToolBox.Electron
+      - run: ./tools/Get-Vgmstream.ps1
+        shell: pwsh
+      - name: Require public release token
+        env:
+          RELEASES_GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          if (-not $env:RELEASES_GITHUB_TOKEN) {
+            throw "Add repository secret RELEASES_GITHUB_TOKEN with Contents: Write on lynshp/OGKToolBox-releases."
+          }
+      - name: Build and publish installer
+        env:
+          OGK_GITHUB_OWNER: lynshp
+          OGK_GITHUB_REPO: OGKToolBox-releases
+          GH_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace "^v",""
+          ./tools/Build-Release.ps1 -Version $version -Publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OGKToolBox-${{ github.ref_name }}-windows
+          path: |
+            artifacts/electron/*.exe
+            artifacts/electron/*.blockmap
+            artifacts/electron/latest.yml
+          if-no-files-found: error
+

@@ -1,0 +1,7 @@
+NYAGEKI Game IO Component - Proprietary Binary
+Copyright (c) 2026 lynshp. All rights reserved.
+
+This precompiled component is excluded from OGKToolBox's MIT source license.
+Permission is granted to use the unmodified component with OGKToolBox, including
+local development and testing. Other use or redistribution requires prior written
+permission from the copyright holder. Third-party dependency licenses remain intact.

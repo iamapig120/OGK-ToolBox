@@ -1,0 +1,40 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/OGKToolBox.Electron/package-lock.json
+      - run: dotnet restore OGKToolBox.slnx
+      - run: dotnet build OGKToolBox.slnx -c Release --no-restore
+      - run: dotnet test OGKToolBox.slnx -c Release --no-build
+      - run: npm ci
+        working-directory: src/OGKToolBox.Electron
+      - run: npm run verify:controller
+        working-directory: src/OGKToolBox.Electron
+      - run: npm test
+        working-directory: src/OGKToolBox.Electron
+      - run: npm run typecheck
+        working-directory: src/OGKToolBox.Electron
+      - run: npm run build
+        working-directory: src/OGKToolBox.Electron
+      - run: ./tools/Get-Vgmstream.ps1
+        shell: pwsh
+      - run: npm run publish:api
+        working-directory: src/OGKToolBox.Electron
+      - run: npx electron-builder --win dir
+        working-directory: src/OGKToolBox.Electron
