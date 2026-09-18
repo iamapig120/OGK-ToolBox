@@ -7,19 +7,25 @@ providers; it does not open the HID device itself. The provider entry point is
 
 The controller UI selects the active backend. An online selection is not displaced when another device
 appears. `OGK_CONTROLLER_MODULE_DIR` selects an external provider exclusively, so the bundled IO4 reader
-does not also open a device being tested by that provider. See [provider integration](CONTROLLER-PROVIDERS.md).
+does not also open a device being tested by that provider.
 
 ## Device matching
 
 | Device mode | VID:PID | HID collection |
 | --- | --- | --- |
-| SimGEKI native | `8088:0101` | Gamepad: Usage Page `01`, Usage `04` |
-| IO4-compatible | `0CA3:0021` | Gamepad: Usage Page `01`, Usage `04` |
-| SimGEKI configuration | `8088:0101` | Vendor: Usage Page `FF00` |
+| Production IO4-compatible identity | `0CA3:0021` | Gamepad: Usage Page `01`, Usage `04` |
+| Debug IO4-compatible identity | `8088:0101` | Gamepad: Usage Page `01`, Usage `04` |
+| SimGEKI configuration | Same as input collection | Vendor: Usage Page `FF00` |
 
-Other gamepads are ignored. Matching these identifiers is only the discovery step; a device must also
-implement the report layout below. Additional hardware identities need their own documented matching and
-protocol validation, rather than being assumed compatible from a product name alone.
+Other gamepads are ignored. Both identifiers only discover an IO4-compatible input; neither identifies a
+device as SimGEKI. When a vendor collection with the same VID, PID and (when available) serial number is
+present, the provider queries the configuration protocol. Only a successful, valid mode readback promotes
+the device identity to SimGEKI and exposes the three writable SimGEKI mode options.
+
+The displayed controller name is read from the physical USB parent's localized
+`DEVPKEY_Device_BusReportedDeviceDesc` string on Windows. The HID endpoint product string is deliberately
+not used, so strings such as `I/O CONTROL BD;...` do not leak into the UI. Until that lookup completes or
+when it is unavailable, the fallback name is `IO4 兼容控制器`.
 
 ## IO4 input report
 
@@ -36,18 +42,28 @@ the other mapped inputs are active-high. The lever is inverted and scaled into t
 
 ## SimGEKI configuration report
 
-Configuration uses report ID `AA` with a 63-byte payload. Payload byte 1 is the command, byte 2 of a
-response is success (`01`), and payload byte 3 carries the mode for get/set operations.
+Configuration uses report ID `AA` with a 63-byte payload. Payload byte 1 is the command and is echoed in
+the response, payload byte 2 of a response is success (`01`), and payload byte 3 carries the mode for
+get/set operations. Responses are matched to that echoed command so a delayed acknowledgement cannot be
+mistaken for the following command's response.
 
 | Command | Value | Purpose |
 | --- | --- | --- |
 | `01` | none | Read input mode |
 | `02` | payload byte 3 | Set input mode |
 | `81` | none | Persist current configuration |
+| `A0` | none | Calibrate the roller's current position as center |
 
 Modes are `1 = IO4 compatible`, `2 = DLL input`, and `3 = simulated keyboard`. A mode change is shown as
-verified only after set, persist, and readback all succeed. The vendor protocol is never sent to a generic
-`0CA3:0021` IO4 device.
+verified only after set, persist, and command-matched readback all succeed. Every recognized IO4 identity
+may be probed for this configuration collection; devices that do not expose it or fail protocol validation
+remain read-only IO4-compatible devices.
+
+Only mode 1 emits the IO4 input reports used by the application's live monitor. In modes 2 and 3, a valid
+configuration readback marks the controller ready without waiting for an IO4 input frame.
+
+The SimGEKI joystick calibration action sends `A0` while the lever is centered, verifies its success
+response, then sends `81` and verifies that the new center offset was persisted.
 
 The application snapshot exposes supported modes through optional `inputModes` string IDs and labels.
 This provider uses IDs `"1"`, `"2"` and `"3"` and maps the selected `input-mode` command to the device's

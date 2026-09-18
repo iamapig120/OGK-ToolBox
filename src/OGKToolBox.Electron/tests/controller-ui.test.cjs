@@ -9,7 +9,7 @@ const { renderToStaticMarkup } = require('react-dom/server');
 
 function load(bridge = {}, hooks = {}) {
   const source = fs.readFileSync(path.join(__dirname, '../src/controller-page.tsx'), 'utf8')
-    + '\nexport { InputMonitor };\n';
+    + '\nexport { InputMonitor, ControllerAccordionsV2 };\n';
   const code = ts.transpileModule(source, { compilerOptions: {
     target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX
   } }).outputText;
@@ -317,6 +317,27 @@ test('physical keys remain visible without virtual-input handlers', () => {
   assert.equal(key.props['aria-pressed'], true);
   assert.equal(key.props.onPointerDown, undefined);
   assert.equal(key.props.onKeyDown, undefined);
+});
+
+test('SimGEKI shows one center-calibration action without unrelated controls', async () => {
+  const sent = [];
+  const { exports } = load({ controllerLeverCalibration: async action => {
+    sent.push(action);
+    return result(value);
+  } });
+  const value = { ...snapshot(), identity: { kind: 'SimGEKI', displayName: 'SimGEKI街机风格控制器' },
+    capabilities: { inputMonitor: true, virtualKeys: false, mode: true, basicLighting: false,
+      picoLighting: false, hallConfiguration: false, hallCalibration: false,
+      leverConfiguration: false, leverCalibration: true, cardReader: false, bootloader: false },
+    deviceConfig: { valid: true, brightness: 0, groundColor: [0, 0, 0], sideColor: [0, 0, 0],
+      cabPreset: 0, cabGameMapping: false, inputMode: 1, isKmMode: false },
+    lever: { calibrationMin: 0, calibrationMax: 65535, inverted: true, sensitivity: 0, calibrationState: 0 } };
+  const tree = exports.ControllerAccordionsV2({ snapshot: value, command: task => task() });
+  assert.match(render(tree), /校准中心/);
+  assert.doesNotMatch(render(tree), /灯光控制|反转|灵敏度/);
+  buttons(tree)[0].props.onClick();
+  await new Promise(setImmediate);
+  assert.deepEqual(sent, ['center']);
 });
 
 test('late command responses cannot replace a newer connection of the same hardware kind', async () => {

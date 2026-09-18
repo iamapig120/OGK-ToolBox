@@ -47,8 +47,7 @@ The manager presents mode options consistently to the UI, but sends the HTTP `in
 when the provider itself declares those options. For older providers it maps the UI's `native` and
 `keyboard` IDs to the existing boolean `mode` command; the supplied C# Host is not required to implement
 the new optional command.
-See [provider integration](CONTROLLER-PROVIDERS.md) for the contract and [SimGEKI / IO4](SIMGEKI-IO4.md)
-for that adapter's device protocol and validation scope.
+See [SimGEKI / IO4](SIMGEKI-IO4.md) for that adapter's device protocol and validation scope.
 
 ## Packaging
 
